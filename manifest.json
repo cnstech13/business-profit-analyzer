@@ -1,22 +1,22 @@
 {
   "name": "Business Profit Analyzer",
   "short_name": "Profit Analyzer",
-  "description": "Manage products, sales, expenses, customers and business profit.",
+  "description": "A simple business management and profit analysis tool for tracking products, sales, expenses, customers and business performance.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f5f7fb",
+  "background_color": "#f5f7fa",
   "theme_color": "#0b1f3a",
   "icons": [
     {
-      "src": "./icons/icon-192.png",
+      "src": "icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "./icons/icon-512.png",
+      "src": "icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

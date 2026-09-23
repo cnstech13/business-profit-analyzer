@@ -1,3 +1,8 @@
+/* =========================================================
+   BUSINESS PROFIT ANALYZER
+   Service Worker
+   ========================================================= */
+
 const CACHE_NAME = "business-profit-analyzer-v1";
 
 const APP_FILES = [
@@ -5,37 +10,61 @@ const APP_FILES = [
     "./index.html",
     "./style.css",
     "./script.js",
-    "./manifest.json"
+    "./manifest.json",
+
+    "./icons/icon-192.png",
+    "./icons/icon-512.png"
 ];
 
-/* INSTALL */
+
+/* =========================================================
+   INSTALL
+========================================================= */
+
 self.addEventListener("install", event => {
+    console.log("Business Profit Analyzer: Service Worker installing...");
+
     event.waitUntil(
         caches.open(CACHE_NAME)
-            .then(cache => cache.addAll(APP_FILES))
-            .then(() => self.skipWaiting())
+            .then(cache => {
+                return cache.addAll(APP_FILES);
+            })
+            .then(() => {
+                return self.skipWaiting();
+            })
     );
 });
 
 
-/* ACTIVATE */
+/* =========================================================
+   ACTIVATE
+========================================================= */
+
 self.addEventListener("activate", event => {
+    console.log("Business Profit Analyzer: Service Worker activated.");
+
     event.waitUntil(
         caches.keys()
             .then(cacheNames => {
                 return Promise.all(
                     cacheNames
-                        .filter(name => name !== CACHE_NAME)
-                        .map(name => caches.delete(name))
+                        .filter(cacheName => cacheName !== CACHE_NAME)
+                        .map(cacheName => caches.delete(cacheName))
                 );
             })
-            .then(() => self.clients.claim())
+            .then(() => {
+                return self.clients.claim();
+            })
     );
 });
 
 
-/* FETCH */
+/* =========================================================
+   FETCH
+========================================================= */
+
 self.addEventListener("fetch", event => {
+
     if (event.request.method !== "GET") {
         return;
     }
@@ -43,6 +72,7 @@ self.addEventListener("fetch", event => {
     event.respondWith(
         caches.match(event.request)
             .then(cachedResponse => {
+
                 if (cachedResponse) {
                     return cachedResponse;
                 }
@@ -58,8 +88,7 @@ self.addEventListener("fetch", event => {
                             return networkResponse;
                         }
 
-                        const responseClone =
-                            networkResponse.clone();
+                        const responseClone = networkResponse.clone();
 
                         caches.open(CACHE_NAME)
                             .then(cache => {

@@ -1,7 +1,11 @@
 /* =========================================================
    BUSINESS PROFIT ANALYZER
-   Main JavaScript
+   MAIN JAVASCRIPT
    ========================================================= */
+
+/* =========================================================
+   STORAGE
+========================================================= */
 
 const STORAGE_KEY = "businessProfitAnalyzerData";
 
@@ -11,6 +15,7 @@ const defaultData = {
         phone: "",
         address: ""
     },
+
     products: [],
     sales: [],
     expenses: [],
@@ -18,15 +23,23 @@ const defaultData = {
 };
 
 let appData = loadData();
+
 let currentReportRange = "all";
+let toastTimer = null;
 
 
 /* =========================================================
    BASIC HELPERS
-   ========================================================= */
+========================================================= */
 
-function getEl(id) {
-    return document.getElementById(id);
+function generateId(prefix) {
+    return (
+        prefix +
+        "_" +
+        Date.now() +
+        "_" +
+        Math.random().toString(36).substring(2, 8)
+    );
 }
 
 
@@ -45,67 +58,93 @@ function loadData() {
                 ...defaultData.business,
                 ...(parsed.business || {})
             },
-            products: Array.isArray(parsed.products) ? parsed.products : [],
-            sales: Array.isArray(parsed.sales) ? parsed.sales : [],
-            expenses: Array.isArray(parsed.expenses) ? parsed.expenses : [],
+
+            products: Array.isArray(parsed.products)
+                ? parsed.products
+                : [],
+
+            sales: Array.isArray(parsed.sales)
+                ? parsed.sales
+                : [],
+
+            expenses: Array.isArray(parsed.expenses)
+                ? parsed.expenses
+                : [],
+
             customers: Array.isArray(parsed.customers)
                 ? parsed.customers
                 : []
         };
 
     } catch (error) {
-        console.error("Could not load saved data:", error);
+        console.error("Unable to load saved data:", error);
+
         return JSON.parse(JSON.stringify(defaultData));
     }
 }
 
 
 function saveData() {
-    localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(appData)
-    );
+    try {
+        localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify(appData)
+        );
+
+        return true;
+
+    } catch (error) {
+        console.error("Unable to save data:", error);
+
+        showToast(
+            "Storage Error",
+            "Unable to save your data on this device.",
+            "error"
+        );
+
+        return false;
+    }
 }
 
 
-function generateId(prefix = "ID") {
-    return (
-        prefix +
-        "_" +
-        Date.now() +
-        "_" +
-        Math.random()
-            .toString(36)
-            .substring(2, 8)
-    );
+function escapeHTML(value) {
+    if (value === null || value === undefined) {
+        return "";
+    }
+
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
 
-function formatMoney(value) {
-    const number = Number(value) || 0;
+function formatCurrency(amount) {
+    const number = Number(amount) || 0;
 
-    return new Intl.NumberFormat("en-NG", {
-        style: "currency",
-        currency: "NGN",
-        minimumFractionDigits: 2
-    }).format(number);
+    return "₦" + number.toLocaleString("en-NG", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
 }
 
 
-function formatNumber(value) {
-    return new Intl.NumberFormat("en-NG").format(
-        Number(value) || 0
-    );
+function formatNumber(number) {
+    return (Number(number) || 0).toLocaleString("en-NG");
 }
 
 
 function formatDate(dateValue) {
-    if (!dateValue) return "-";
+    if (!dateValue) {
+        return "---";
+    }
 
-    const date = new Date(dateValue);
+    const date = new Date(dateValue + "T00:00:00");
 
     if (Number.isNaN(date.getTime())) {
-        return "-";
+        return dateValue;
     }
 
     return date.toLocaleDateString("en-NG", {
@@ -116,298 +155,20 @@ function formatDate(dateValue) {
 }
 
 
-function escapeHTML(value) {
-    return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
-
-
-function getTodayStart() {
+function getToday() {
     const date = new Date();
 
-    return new Date(
-        date.getFullYear(),
-        date.getMonth(),
+    const year = date.getFullYear();
+
+    const month = String(
+        date.getMonth() + 1
+    ).padStart(2, "0");
+
+    const day = String(
         date.getDate()
-    );
-}
+    ).padStart(2, "0");
 
-
-function getDateValue(dateValue) {
-    const date = new Date(dateValue);
-
-    if (Number.isNaN(date.getTime())) {
-        return null;
-    }
-
-    return date;
-}
-
-
-/* =========================================================
-   SWEETALERT HELPERS
-   ========================================================= */
-
-function showSuccess(message) {
-    if (typeof Swal !== "undefined") {
-        Swal.fire({
-            icon: "success",
-            title: "Success",
-            text: message,
-            confirmButtonColor: "#0b1f3a"
-        });
-    } else {
-        alert(message);
-    }
-}
-
-
-function showError(message) {
-    if (typeof Swal !== "undefined") {
-        Swal.fire({
-            icon: "error",
-            title: "Error",
-            text: message,
-            confirmButtonColor: "#0b1f3a"
-        });
-    } else {
-        alert(message);
-    }
-}
-
-
-function showWarning(message) {
-    if (typeof Swal !== "undefined") {
-        Swal.fire({
-            icon: "warning",
-            title: "Notice",
-            text: message,
-            confirmButtonColor: "#0b1f3a"
-        });
-    } else {
-        alert(message);
-    }
-}
-
-
-function showToast(message, icon = "success") {
-    if (typeof Swal !== "undefined") {
-        Swal.fire({
-            toast: true,
-            position: "top-end",
-            icon,
-            title: message,
-            showConfirmButton: false,
-            timer: 2200,
-            timerProgressBar: true
-        });
-    }
-}
-
-
-async function showConfirm(title, text) {
-    if (typeof Swal === "undefined") {
-        return confirm(text);
-    }
-
-    const result = await Swal.fire({
-        icon: "warning",
-        title,
-        text,
-        showCancelButton: true,
-        confirmButtonText: "Yes, continue",
-        cancelButtonText: "Cancel",
-        confirmButtonColor: "#0b1f3a",
-        cancelButtonColor: "#777"
-    });
-
-    return result.isConfirmed;
-}
-
-
-/* =========================================================
-   NAVIGATION
-   ========================================================= */
-
-function showPage(pageName) {
-    const pages = document.querySelectorAll(".page");
-    const navItems = document.querySelectorAll(".nav-item");
-
-    pages.forEach(page => {
-        page.classList.remove("active");
-    });
-
-    navItems.forEach(item => {
-        item.classList.remove("active");
-    });
-
-    const selectedPage = getEl(pageName + "Page");
-
-    if (selectedPage) {
-        selectedPage.classList.add("active");
-    }
-
-    const selectedNav = document.querySelector(
-        `.nav-item[data-page="${pageName}"]`
-    );
-
-    if (selectedNav) {
-        selectedNav.classList.add("active");
-    }
-
-    updatePageHeader(pageName);
-
-    closeMobileMenu();
-
-    window.scrollTo({
-        top: 0,
-        behavior: "smooth"
-    });
-}
-
-
-function updatePageHeader(pageName) {
-    const pageTitle = getEl("pageTitle");
-    const pageSubtitle = getEl("pageSubtitle");
-
-    const titles = {
-        dashboard: {
-            title: "Dashboard",
-            subtitle: "Overview of your business performance"
-        },
-        products: {
-            title: "Products",
-            subtitle: "Manage your products and inventory"
-        },
-        sales: {
-            title: "Sales",
-            subtitle: "Record and monitor your sales"
-        },
-        expenses: {
-            title: "Expenses",
-            subtitle: "Track your business expenses"
-        },
-        customers: {
-            title: "Customers",
-            subtitle: "Manage your customer information"
-        },
-        reports: {
-            title: "Reports",
-            subtitle: "Analyze your business performance"
-        },
-        settings: {
-            title: "Settings",
-            subtitle: "Manage your business information and data"
-        }
-    };
-
-    const info = titles[pageName] || titles.dashboard;
-
-    if (pageTitle) {
-        pageTitle.textContent = info.title;
-    }
-
-    if (pageSubtitle) {
-        pageSubtitle.textContent = info.subtitle;
-    }
-}
-
-
-function openModal(modalId) {
-    const modal = getEl(modalId);
-
-    if (modal) {
-        modal.classList.add("active");
-    }
-}
-
-
-function closeModal(modalId) {
-    const modal = getEl(modalId);
-
-    if (modal) {
-        modal.classList.remove("active");
-    }
-}
-
-
-function closeAllModals() {
-    document.querySelectorAll(".modal").forEach(modal => {
-        modal.classList.remove("active");
-    });
-}
-
-
-/* =========================================================
-   MOBILE MENU
-   ========================================================= */
-
-function toggleMobileMenu() {
-    const sidebar = getEl("sidebar");
-    const menuToggle = getEl("menuToggle");
-
-    if (!sidebar) return;
-
-    sidebar.classList.toggle("mobile-open");
-
-    if (menuToggle) {
-        const isOpen = sidebar.classList.contains("mobile-open");
-
-        menuToggle.setAttribute(
-            "aria-expanded",
-            isOpen ? "true" : "false"
-        );
-    }
-}
-
-
-function closeMobileMenu() {
-    const sidebar = getEl("sidebar");
-    const menuToggle = getEl("menuToggle");
-
-    if (sidebar) {
-        sidebar.classList.remove("mobile-open");
-    }
-
-    if (menuToggle) {
-        menuToggle.setAttribute(
-            "aria-expanded",
-            "false"
-        );
-    }
-}
-
-
-/* =========================================================
-   PRODUCT HELPERS
-   ========================================================= */
-
-function getProductStatus(product) {
-    const stock = Number(product.stock) || 0;
-    const lowLevel = Number(product.lowStockLevel) || 0;
-
-    if (stock <= 0) {
-        return {
-            text: "Out of Stock",
-            className: "danger"
-        };
-    }
-
-    if (stock <= lowLevel) {
-        return {
-            text: "Low Stock",
-            className: "warning"
-        };
-    }
-
-    return {
-        text: "In Stock",
-        className: "success"
-    };
+    return `${year}-${month}-${day}`;
 }
 
 
@@ -418,192 +179,634 @@ function getProductById(id) {
 }
 
 
-function findProductByName(name) {
-    const searchName = String(name)
-        .trim()
-        .toLowerCase();
-
-    return appData.products.find(
-        product =>
-            String(product.name)
-                .trim()
-                .toLowerCase() === searchName
+function getCustomerById(id) {
+    return appData.customers.find(
+        customer => customer.id === id
     );
 }
 
 
 /* =========================================================
-   DASHBOARD
-   ========================================================= */
+   DOM HELPERS
+========================================================= */
 
-function calculateTotals() {
-    const totalSales = appData.sales.reduce(
-        (sum, sale) => sum + Number(sale.revenue || 0),
-        0
-    );
-
-    const totalCost = appData.sales.reduce(
-        (sum, sale) => sum + Number(sale.cost || 0),
-        0
-    );
-
-    const grossProfit = appData.sales.reduce(
-        (sum, sale) => sum + Number(sale.profit || 0),
-        0
-    );
-
-    const totalExpenses = appData.expenses.reduce(
-        (sum, expense) => sum + Number(expense.amount || 0),
-        0
-    );
-
-    const netProfit = grossProfit - totalExpenses;
-
-    const profitMargin =
-        totalSales > 0
-            ? (netProfit / totalSales) * 100
-            : 0;
-
-    return {
-        totalSales,
-        totalCost,
-        grossProfit,
-        totalExpenses,
-        netProfit,
-        profitMargin
-    };
+function getElement(id) {
+    return document.getElementById(id);
 }
 
 
-function renderDashboard() {
-    const totals = calculateTotals();
+function showElement(id) {
+    const element = getElement(id);
 
-    if (getEl("totalSales")) {
-        getEl("totalSales").textContent =
-            formatMoney(totals.totalSales);
+    if (element) {
+        element.style.display = "";
+    }
+}
+
+
+function hideElement(id) {
+    const element = getElement(id);
+
+    if (element) {
+        element.style.display = "none";
+    }
+}
+
+
+/* =========================================================
+   INITIALIZATION
+========================================================= */
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    initializeNavigation();
+
+    initializeSidebar();
+
+    initializeButtons();
+
+    initializeForms();
+
+    initializeSearch();
+
+    initializeModals();
+
+    initializeReports();
+
+    initializeSettings();
+
+    setDefaultDates();
+
+    refreshApplication();
+
+    console.log(
+        "Business Profit Analyzer JavaScript is working."
+    );
+});
+
+
+/* =========================================================
+   REFRESH EVERYTHING
+========================================================= */
+
+function refreshApplication() {
+
+    updateBusinessInformation();
+
+    updateDashboard();
+
+    renderProducts();
+
+    renderSales();
+
+    renderExpenses();
+
+    renderCustomers();
+
+    populateSaleProducts();
+
+    populateSaleCustomers();
+
+    updateReports();
+
+    updateSettingsForm();
+}
+
+
+/* =========================================================
+   NAVIGATION
+========================================================= */
+
+function initializeNavigation() {
+
+    const navItems = document.querySelectorAll(
+        ".nav-item"
+    );
+
+    navItems.forEach(item => {
+
+        item.addEventListener("click", () => {
+
+            const pageName = item.dataset.page;
+
+            if (!pageName) {
+                return;
+            }
+
+            openPage(pageName);
+
+            closeMobileSidebar();
+        });
+    });
+
+
+    document.querySelectorAll(
+        '[data-page]'
+    ).forEach(element => {
+
+        if (
+            !element.classList.contains("nav-item")
+        ) {
+
+            element.addEventListener("click", () => {
+
+                const pageName =
+                    element.dataset.page;
+
+                if (pageName) {
+                    openPage(pageName);
+                }
+            });
+        }
+    });
+}
+
+
+function openPage(pageName) {
+
+    const pages = document.querySelectorAll(
+        ".page"
+    );
+
+    pages.forEach(page => {
+        page.classList.remove("active");
+    });
+
+
+    const selectedPage = getElement(
+        pageName + "Page"
+    );
+
+    if (selectedPage) {
+        selectedPage.classList.add("active");
     }
 
-    if (getEl("totalCost")) {
-        getEl("totalCost").textContent =
-            formatMoney(totals.totalCost);
+
+    const navItems = document.querySelectorAll(
+        ".nav-item"
+    );
+
+    navItems.forEach(item => {
+
+        item.classList.toggle(
+            "active",
+            item.dataset.page === pageName
+        );
+    });
+
+
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+
+
+    if (pageName === "reports") {
+        updateReports();
     }
 
-    if (getEl("grossProfit")) {
-        getEl("grossProfit").textContent =
-            formatMoney(totals.grossProfit);
+    if (pageName === "dashboard") {
+        updateDashboard();
+    }
+}
+
+
+/* =========================================================
+   MOBILE SIDEBAR
+========================================================= */
+
+function initializeSidebar() {
+
+    const menuBtn = getElement("menuBtn");
+
+    const sidebar = getElement("sidebar");
+
+    const overlay =
+        getElement("sidebarOverlay");
+
+
+    if (menuBtn) {
+
+        menuBtn.addEventListener(
+            "click",
+            () => {
+
+                if (!sidebar) {
+                    return;
+                }
+
+                sidebar.classList.toggle("open");
+
+                if (overlay) {
+                    overlay.classList.toggle(
+                        "show",
+                        sidebar.classList.contains("open")
+                    );
+                }
+            }
+        );
     }
 
-    if (getEl("totalExpenses")) {
-        getEl("totalExpenses").textContent =
-            formatMoney(totals.totalExpenses);
+
+    if (overlay) {
+
+        overlay.addEventListener(
+            "click",
+            closeMobileSidebar
+        );
+    }
+}
+
+
+function closeMobileSidebar() {
+
+    const sidebar = getElement("sidebar");
+
+    const overlay =
+        getElement("sidebarOverlay");
+
+
+    if (sidebar) {
+        sidebar.classList.remove("open");
     }
 
-    if (getEl("netProfit")) {
-        getEl("netProfit").textContent =
-            formatMoney(totals.netProfit);
+    if (overlay) {
+        overlay.classList.remove("show");
+    }
+}
+
+
+/* =========================================================
+   BUTTONS
+========================================================= */
+
+function initializeButtons() {
+
+    const addProductBtn =
+        getElement("addProductBtn");
+
+    const addSaleBtn =
+        getElement("addSaleBtn");
+
+    const addExpenseBtn =
+        getElement("addExpenseBtn");
+
+    const addCustomerBtn =
+        getElement("addCustomerBtn");
+
+    const quickSaleBtn =
+        getElement("quickSaleBtn");
+
+
+    if (addProductBtn) {
+        addProductBtn.addEventListener(
+            "click",
+            () => openProductModal()
+        );
     }
 
-    if (getEl("profitMargin")) {
-        getEl("profitMargin").textContent =
-            totals.profitMargin.toFixed(2) + "%";
+
+    if (addSaleBtn) {
+        addSaleBtn.addEventListener(
+            "click",
+            () => openSaleModal()
+        );
     }
+
+
+    if (quickSaleBtn) {
+        quickSaleBtn.addEventListener(
+            "click",
+            () => openSaleModal()
+        );
+    }
+
+
+    if (addExpenseBtn) {
+        addExpenseBtn.addEventListener(
+            "click",
+            () => openExpenseModal()
+        );
+    }
+
+
+    if (addCustomerBtn) {
+        addCustomerBtn.addEventListener(
+            "click",
+            () => openCustomerModal()
+        );
+    }
+
+
+    document.querySelectorAll(
+        ".quick-action"
+    ).forEach(button => {
+
+        button.addEventListener("click", () => {
+
+            const action =
+                button.dataset.action;
+
+            if (action === "product") {
+                openProductModal();
+            }
+
+            if (action === "sale") {
+                openSaleModal();
+            }
+
+            if (action === "expense") {
+                openExpenseModal();
+            }
+
+            if (action === "customer") {
+                openCustomerModal();
+            }
+        });
+    });
+
+
+    const notificationBtn =
+        getElement("notificationBtn");
+
+    if (notificationBtn) {
+
+        notificationBtn.addEventListener(
+            "click",
+            () => {
+
+                showToast(
+                    "Business Analyzer",
+                    "Your business data is stored locally on this device.",
+                    "success"
+                );
+            }
+        );
+    }
+}
+
+
+/* =========================================================
+   BUSINESS INFORMATION
+========================================================= */
+
+function updateBusinessInformation() {
+
+    const businessName =
+        appData.business.name ||
+        "My Business";
+
+
+    const dashboardName =
+        getElement("dashboardBusinessName");
+
+    if (dashboardName) {
+        dashboardName.textContent =
+            businessName;
+    }
+
+
+    const receiptName =
+        getElement("receiptBusinessName");
+
+    if (receiptName) {
+        receiptName.textContent =
+            businessName;
+    }
+
+
+    const receiptPhone =
+        getElement("receiptBusinessPhone");
+
+    if (receiptPhone) {
+        receiptPhone.textContent =
+            appData.business.phone || "";
+    }
+
+
+    const receiptAddress =
+        getElement("receiptBusinessAddress");
+
+    if (receiptAddress) {
+        receiptAddress.textContent =
+            appData.business.address || "";
+    }
+}
+
+
+/* =========================================================
+   DASHBOARD
+========================================================= */
+
+function updateDashboard() {
+
+    const totalSales =
+        appData.sales.reduce(
+            (total, sale) =>
+                total + Number(sale.total || 0),
+            0
+        );
+
+
+    const totalExpenses =
+        appData.expenses.reduce(
+            (total, expense) =>
+                total + Number(expense.amount || 0),
+            0
+        );
+
+
+    const netProfit =
+        totalSales - totalExpenses;
+
+
+    const totalSalesElement =
+        getElement("totalSales");
+
+    const totalExpensesElement =
+        getElement("totalExpenses");
+
+    const netProfitElement =
+        getElement("netProfit");
+
+    const totalProductsElement =
+        getElement("totalProducts");
+
+
+    if (totalSalesElement) {
+        totalSalesElement.textContent =
+            formatCurrency(totalSales);
+    }
+
+
+    if (totalExpensesElement) {
+        totalExpensesElement.textContent =
+            formatCurrency(totalExpenses);
+    }
+
+
+    if (netProfitElement) {
+        netProfitElement.textContent =
+            formatCurrency(netProfit);
+
+        netProfitElement.style.color =
+            netProfit < 0
+                ? "#d93025"
+                : "";
+    }
+
+
+    if (totalProductsElement) {
+        totalProductsElement.textContent =
+            formatNumber(appData.products.length);
+    }
+
 
     renderRecentSales();
-    renderLowStock();
-    renderBusinessSummary();
+
+    renderSalesChart();
 }
 
 
-function renderRecentSales() {
-    const container = getEl("recentSalesContainer");
+/* =========================================================
+   RECENT SALES
+========================================================= */
 
-    if (!container) return;
+function renderRecentSales() {
+
+    const container =
+        getElement("recentSales");
+
+    if (!container) {
+        return;
+    }
+
 
     const sales = [...appData.sales]
         .sort(
             (a, b) =>
-                new Date(b.date) - new Date(a.date)
+                new Date(
+                    b.date
+                ) -
+                new Date(
+                    a.date
+                )
         )
         .slice(0, 5);
 
+
     if (sales.length === 0) {
+
         container.innerHTML = `
             <div class="empty-state">
-                <div class="empty-icon">🛒</div>
-                <h3>No sales yet</h3>
-                <p>Your recent sales will appear here.</p>
+
+                <div class="empty-icon">
+                    💰
+                </div>
+
+                <h4>
+                    No sales yet
+                </h4>
+
+                <p>
+                    Your recent sales will appear here.
+                </p>
+
             </div>
         `;
+
         return;
     }
 
-    container.innerHTML = sales
-        .map(sale => `
-            <div class="list-row">
-                <div>
-                    <strong>${escapeHTML(sale.productName)}</strong>
-                    <small>
-                        ${formatDate(sale.date)}
-                        • Qty: ${formatNumber(sale.quantity)}
-                    </small>
-                </div>
 
-                <div class="list-value">
-                    <strong>${formatMoney(sale.revenue)}</strong>
-                    <small class="profit-text">
-                        Profit: ${formatMoney(sale.profit)}
-                    </small>
-                </div>
-            </div>
-        `)
-        .join("");
-}
+    container.innerHTML =
+        sales.map(sale => {
 
+            const product =
+                getProductById(
+                    sale.productId
+                );
 
-function renderLowStock() {
-    const container = getEl("lowStockContainer");
+            const customer =
+                getCustomerById(
+                    sale.customerId
+                );
 
-    if (!container) return;
-
-    const lowStockProducts = appData.products.filter(product => {
-        const stock = Number(product.stock) || 0;
-        const lowLevel = Number(product.lowStockLevel) || 0;
-
-        return stock <= lowLevel;
-    });
-
-    if (lowStockProducts.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-icon">✅</div>
-                <h3>Stock levels are good</h3>
-                <p>No products currently need restocking.</p>
-            </div>
-        `;
-        return;
-    }
-
-    container.innerHTML = lowStockProducts
-        .map(product => {
-            const status = getProductStatus(product);
 
             return `
-                <div class="list-row">
-                    <div>
-                        <strong>${escapeHTML(product.name)}</strong>
-                        <small>
-                            ${escapeHTML(product.category || "Uncategorized")}
-                        </small>
+                <div class="recent-sale-item"
+                     style="
+                        display:flex;
+                        align-items:center;
+                        gap:10px;
+                        padding:11px 0;
+                        border-bottom:1px solid #eef1f5;
+                     ">
+
+                    <div
+                        style="
+                            width:36px;
+                            height:36px;
+                            border-radius:10px;
+                            background:#fff8d6;
+                            display:flex;
+                            align-items:center;
+                            justify-content:center;
+                            flex-shrink:0;
+                        "
+                    >
+                        💰
                     </div>
 
-                    <div>
-                        <span class="status-badge ${status.className}">
-                            ${status.text}
-                        </span>
-                        <small>
-                            ${formatNumber(product.stock)} left
+                    <div style="flex:1;min-width:0;">
+
+                        <strong
+                            style="
+                                display:block;
+                                color:#172033;
+                                font-size:11px;
+                                overflow:hidden;
+                                text-overflow:ellipsis;
+                                white-space:nowrap;
+                            "
+                        >
+                            ${escapeHTML(
+                                product
+                                    ? product.name
+                                    : "Deleted Product"
+                            )}
+                        </strong>
+
+                        <small
+                            style="
+                                display:block;
+                                color:#8b95a7;
+                                font-size:9px;
+                                margin-top:3px;
+                            "
+                        >
+                            ${formatDate(sale.date)}
+                            ·
+                            ${escapeHTML(
+                                customer
+                                    ? customer.name
+                                    : "Walk-in Customer"
+                            )}
                         </small>
+
                     </div>
+
+                    <strong
+                        style="
+                            color:#0b1f3a;
+                            font-size:11px;
+                        "
+                    >
+                        ${formatCurrency(
+                            sale.total
+                        )}
+                    </strong>
+
                 </div>
             `;
         })
@@ -611,146 +814,499 @@ function renderLowStock() {
 }
 
 
-function renderBusinessSummary() {
-    const container = getEl("businessSummary");
+/* =========================================================
+   SALES CHART
+========================================================= */
 
-    if (!container) return;
+function renderSalesChart() {
 
-    const totalStock = appData.products.reduce(
-        (sum, product) =>
-            sum + Number(product.stock || 0),
-        0
-    );
+    const container =
+        getElement("salesChart");
+
+    if (!container) {
+        return;
+    }
+
+
+    if (appData.sales.length === 0) {
+
+        container.innerHTML = `
+            <div class="empty-chart">
+
+                <div>
+                    📈
+                </div>
+
+                <p>
+                    No sales data yet
+                </p>
+
+                <small>
+                    Record your first sale to see your
+                    sales chart.
+                </small>
+
+            </div>
+        `;
+
+        return;
+    }
+
+
+    const rangeElement =
+        getElement("salesChartRange");
+
+    const days =
+        Number(
+            rangeElement
+                ? rangeElement.value
+                : 7
+        );
+
+
+    const today = new Date();
+
+    const data = [];
+
+
+    for (
+        let i = days - 1;
+        i >= 0;
+        i--
+    ) {
+
+        const date =
+            new Date(today);
+
+        date.setDate(
+            today.getDate() - i
+        );
+
+
+        const dateString =
+            date.toISOString()
+                .split("T")[0];
+
+
+        const amount =
+            appData.sales
+                .filter(
+                    sale =>
+                        sale.date ===
+                        dateString
+                )
+                .reduce(
+                    (sum, sale) =>
+                        sum +
+                        Number(
+                            sale.total || 0
+                        ),
+                    0
+                );
+
+
+        data.push({
+            date: dateString,
+            amount
+        });
+    }
+
+
+    const maxAmount =
+        Math.max(
+            ...data.map(item => item.amount),
+            1
+        );
+
+
+    const chartHeight = 220;
+
+
+    let svgWidth = 700;
+
+
+    if (
+        container.clientWidth &&
+        container.clientWidth < 700
+    ) {
+        svgWidth =
+            Math.max(
+                500,
+                container.clientWidth - 30
+            );
+    }
+
+
+    const horizontalPadding = 35;
+
+    const verticalPadding = 25;
+
+    const graphWidth =
+        svgWidth -
+        horizontalPadding * 2;
+
+    const graphHeight =
+        chartHeight -
+        verticalPadding * 2;
+
+
+    const points =
+        data.map((item, index) => {
+
+            const x =
+                horizontalPadding +
+                (
+                    index /
+                    Math.max(
+                        data.length - 1,
+                        1
+                    )
+                ) *
+                graphWidth;
+
+
+            const y =
+                verticalPadding +
+                graphHeight -
+                (
+                    item.amount /
+                    maxAmount
+                ) *
+                graphHeight;
+
+
+            return {
+                x,
+                y,
+                ...item
+            };
+        });
+
+
+    const linePoints =
+        points
+            .map(
+                point =>
+                    `${point.x},${point.y}`
+            )
+            .join(" ");
+
+
+    const areaPoints =
+        [
+            `${horizontalPadding},${chartHeight - verticalPadding}`,
+            linePoints,
+            `${horizontalPadding + graphWidth},${chartHeight - verticalPadding}`
+        ]
+            .join(" ");
+
+
+    const visibleLabels =
+        data.length <= 10
+            ? data
+            : data.filter(
+                (_, index) =>
+                    index %
+                        Math.ceil(
+                            data.length / 7
+                        ) ===
+                    0
+            );
+
 
     container.innerHTML = `
-        <div class="summary-item">
-            <span>Products</span>
-            <strong>${formatNumber(appData.products.length)}</strong>
-        </div>
+        <div
+            style="
+                width:100%;
+                overflow-x:auto;
+            "
+        >
 
-        <div class="summary-item">
-            <span>Stock Units</span>
-            <strong>${formatNumber(totalStock)}</strong>
-        </div>
+            <svg
+                viewBox="0 0 ${svgWidth} ${chartHeight}"
+                width="100%"
+                height="${chartHeight}"
+                preserveAspectRatio="none"
+                style="min-width:500px;"
+            >
 
-        <div class="summary-item">
-            <span>Customers</span>
-            <strong>${formatNumber(appData.customers.length)}</strong>
-        </div>
+                <defs>
 
-        <div class="summary-item">
-            <span>Sales Transactions</span>
-            <strong>${formatNumber(appData.sales.length)}</strong>
+                    <linearGradient
+                        id="salesGradient"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                    >
+
+                        <stop
+                            offset="0%"
+                            stop-color="#d4af37"
+                            stop-opacity="0.35"
+                        />
+
+                        <stop
+                            offset="100%"
+                            stop-color="#d4af37"
+                            stop-opacity="0"
+                        />
+
+                    </linearGradient>
+
+                </defs>
+
+
+                ${[0, 0.25, 0.5, 0.75, 1]
+                    .map(level => {
+
+                        const y =
+                            verticalPadding +
+                            graphHeight -
+                            level *
+                            graphHeight;
+
+                        const value =
+                            maxAmount *
+                            level;
+
+                        return `
+                            <line
+                                x1="${horizontalPadding}"
+                                y1="${y}"
+                                x2="${horizontalPadding + graphWidth}"
+                                y2="${y}"
+                                stroke="#e9edf3"
+                                stroke-width="1"
+                            />
+
+                            <text
+                                x="3"
+                                y="${y + 3}"
+                                font-size="8"
+                                fill="#8b95a7"
+                            >
+                                ${formatCurrency(value)}
+                            </text>
+                        `;
+                    })
+                    .join("")}
+
+
+                <polygon
+                    points="${areaPoints}"
+                    fill="url(#salesGradient)"
+                />
+
+
+                <polyline
+                    points="${linePoints}"
+                    fill="none"
+                    stroke="#d4af37"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                />
+
+
+                ${points
+                    .map(
+                        point =>
+                            `
+                            <circle
+                                cx="${point.x}"
+                                cy="${point.y}"
+                                r="3.5"
+                                fill="#ffffff"
+                                stroke="#d4af37"
+                                stroke-width="2"
+                            />
+                            `
+                    )
+                    .join("")}
+
+
+                ${visibleLabels
+                    .map(item => {
+
+                        const point =
+                            points.find(
+                                point =>
+                                    point.date ===
+                                    item.date
+                            );
+
+                        if (!point) {
+                            return "";
+                        }
+
+                        const labelDate =
+                            new Date(
+                                item.date +
+                                "T00:00:00"
+                            );
+
+
+                        return `
+                            <text
+                                x="${point.x}"
+                                y="${chartHeight - 5}"
+                                text-anchor="middle"
+                                font-size="8"
+                                fill="#8b95a7"
+                            >
+                                ${labelDate.toLocaleDateString(
+                                    "en-NG",
+                                    {
+                                        day: "numeric",
+                                        month: "short"
+                                    }
+                                )}
+                            </text>
+                        `;
+                    })
+                    .join("")}
+
+            </svg>
+
         </div>
     `;
 }
 
 
 /* =========================================================
-   PRODUCTS
-   ========================================================= */
+   PRODUCT MANAGEMENT
+========================================================= */
 
-function renderProducts() {
-    const tbody = getEl("productsTableBody");
+function renderProducts(searchTerm = "") {
 
-    if (!tbody) return;
+    const tbody =
+        getElement("productsTableBody");
 
-    const searchInput = getEl("productSearch");
+    const empty =
+        getElement("productsEmpty");
 
-    const searchTerm = searchInput
-        ? searchInput.value.trim().toLowerCase()
-        : "";
-
-    const products = appData.products.filter(product => {
-        if (!searchTerm) return true;
-
-        return (
-            String(product.name)
-                .toLowerCase()
-                .includes(searchTerm) ||
-            String(product.category || "")
-                .toLowerCase()
-                .includes(searchTerm)
-        );
-    });
-
-    updateProductCounters();
-
-    if (products.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="8">
-                    <div class="empty-state">
-                        <div class="empty-icon">📦</div>
-                        <h3>No products found</h3>
-                        <p>Add a product to start managing your inventory.</p>
-                    </div>
-                </td>
-            </tr>
-        `;
+    if (!tbody || !empty) {
         return;
     }
 
-    tbody.innerHTML = products
-        .map(product => {
-            const status = getProductStatus(product);
-            const profit =
-                Number(product.sellingPrice || 0) -
-                Number(product.costPrice || 0);
+
+    const search =
+        searchTerm
+            .trim()
+            .toLowerCase();
+
+
+    const products =
+        appData.products.filter(product => {
+
+            if (!search) {
+                return true;
+            }
+
+            return (
+                String(product.name || "")
+                    .toLowerCase()
+                    .includes(search)
+                ||
+                String(product.category || "")
+                    .toLowerCase()
+                    .includes(search)
+            );
+        });
+
+
+    tbody.innerHTML = "";
+
+
+    if (products.length === 0) {
+
+        empty.classList.add("show");
+
+        return;
+    }
+
+
+    empty.classList.remove("show");
+
+
+    tbody.innerHTML =
+        products.map(product => {
 
             return `
                 <tr>
+
                     <td>
-                        <strong>${escapeHTML(product.name)}</strong>
+                        <strong>
+                            ${escapeHTML(
+                                product.name
+                            )}
+                        </strong>
                     </td>
 
                     <td>
-                        ${escapeHTML(product.category || "-")}
+                        ${escapeHTML(
+                            product.category ||
+                            "Uncategorized"
+                        )}
                     </td>
 
                     <td>
-                        ${formatMoney(product.costPrice)}
+                        ${formatCurrency(
+                            product.costPrice
+                        )}
                     </td>
 
                     <td>
-                        ${formatMoney(product.sellingPrice)}
+                        ${formatCurrency(
+                            product.sellingPrice
+                        )}
                     </td>
 
                     <td>
-                        <strong>${formatMoney(profit)}</strong>
-                    </td>
 
-                    <td>
-                        ${formatNumber(product.stock)}
-                    </td>
-
-                    <td>
-                        <span class="status-badge ${status.className}">
-                            ${status.text}
+                        <span
+                            class="badge ${
+                                Number(
+                                    product.stock
+                                ) <= 5
+                                    ? "badge-warning"
+                                    : "badge-success"
+                            }"
+                        >
+                            ${formatNumber(
+                                product.stock
+                            )}
                         </span>
+
                     </td>
 
                     <td>
-                        <div class="table-actions">
+
+                        <div class="action-buttons">
+
                             <button
                                 type="button"
                                 class="action-btn edit"
-                                data-action="edit-product"
-                                data-id="${product.id}"
+                                title="Edit product"
+                                onclick="editProduct('${product.id}')"
                             >
-                                Edit
+                                ✏️
                             </button>
 
                             <button
                                 type="button"
                                 class="action-btn delete"
-                                data-action="delete-product"
-                                data-id="${product.id}"
+                                title="Delete product"
+                                onclick="deleteProduct('${product.id}')"
                             >
-                                Delete
+                                🗑️
                             </button>
+
                         </div>
+
                     </td>
+
                 </tr>
             `;
         })
@@ -758,1773 +1314,2011 @@ function renderProducts() {
 }
 
 
-function updateProductCounters() {
-    const totalProducts = appData.products.length;
+function openProductModal(productId = "") {
 
-    const totalStock = appData.products.reduce(
-        (sum, product) =>
-            sum + Number(product.stock || 0),
-        0
-    );
+    const modal =
+        getElement("productModal");
 
-    const lowStock = appData.products.filter(product => {
-        const stock = Number(product.stock) || 0;
-        const lowLevel = Number(product.lowStockLevel) || 0;
+    const form =
+        getElement("productForm");
 
-        return stock > 0 && stock <= lowLevel;
-    }).length;
-
-    const outOfStock = appData.products.filter(
-        product => Number(product.stock) <= 0
-    ).length;
-
-    if (getEl("productCount")) {
-        getEl("productCount").textContent =
-            formatNumber(totalProducts);
-    }
-
-    if (getEl("stockCount")) {
-        getEl("stockCount").textContent =
-            formatNumber(totalStock);
-    }
-
-    if (getEl("lowStockCount")) {
-        getEl("lowStockCount").textContent =
-            formatNumber(lowStock);
-    }
-
-    if (getEl("outStockCount")) {
-        getEl("outStockCount").textContent =
-            formatNumber(outOfStock);
-    }
-}
-
-
-function openAddProductModal() {
-    const form = getEl("productForm");
-
-    if (form) {
-        form.reset();
-    }
-
-    if (getEl("productId")) {
-        getEl("productId").value = "";
-    }
-
-    const title = getEl("productModalTitle");
-
-    if (title) {
-        title.textContent = "Add Product";
-    }
-
-    openModal("productModal");
-}
-
-
-function openEditProductModal(productId) {
-    const product = getProductById(productId);
-
-    if (!product) return;
-
-    if (getEl("productId")) {
-        getEl("productId").value = product.id;
-    }
-
-    if (getEl("productName")) {
-        getEl("productName").value = product.name;
-    }
-
-    if (getEl("productCategory")) {
-        getEl("productCategory").value =
-            product.category || "";
-    }
-
-    if (getEl("costPrice")) {
-        getEl("costPrice").value =
-            product.costPrice;
-    }
-
-    if (getEl("sellingPrice")) {
-        getEl("sellingPrice").value =
-            product.sellingPrice;
-    }
-
-    if (getEl("productStock")) {
-        getEl("productStock").value =
-            product.stock;
-    }
-
-    if (getEl("lowStockLevel")) {
-        getEl("lowStockLevel").value =
-            product.lowStockLevel;
-    }
-
-    const title = getEl("productModalTitle");
-
-    if (title) {
-        title.textContent = "Edit Product";
-    }
-
-    openModal("productModal");
-}
-
-
-function saveProduct(event) {
-    event.preventDefault();
-
-    const id = getEl("productId").value.trim();
-
-    const name = getEl("productName").value.trim();
-    const category = getEl("productCategory").value.trim();
-
-    const costPrice = Number(
-        getEl("costPrice").value
-    );
-
-    const sellingPrice = Number(
-        getEl("sellingPrice").value
-    );
-
-    const stock = Number(
-        getEl("productStock").value
-    );
-
-    const lowStockLevel = Number(
-        getEl("lowStockLevel").value
-    );
-
-    if (!name) {
-        showError("Please enter the product name.");
+    if (!modal || !form) {
         return;
     }
 
-    if (
-        !Number.isFinite(costPrice) ||
-        costPrice < 0
-    ) {
-        showError("Please enter a valid cost price.");
-        return;
-    }
 
-    if (
-        !Number.isFinite(sellingPrice) ||
-        sellingPrice < 0
-    ) {
-        showError("Please enter a valid selling price.");
-        return;
-    }
+    form.reset();
 
-    if (
-        !Number.isFinite(stock) ||
-        stock < 0
-    ) {
-        showError("Please enter a valid stock quantity.");
-        return;
-    }
 
-    if (
-        !Number.isFinite(lowStockLevel) ||
-        lowStockLevel < 0
-    ) {
-        showError("Please enter a valid low-stock level.");
-        return;
-    }
+    getElement("productId").value =
+        "";
 
-    const duplicate = appData.products.find(
-        product =>
-            product.name.trim().toLowerCase() ===
-                name.toLowerCase() &&
-            product.id !== id
-    );
 
-    if (duplicate) {
-        showError(
-            "A product with this name already exists."
-        );
-        return;
-    }
+    getElement("productModalTitle").textContent =
+        "Add Product";
 
-    if (id) {
-        const product = getProductById(id);
+
+    if (productId) {
+
+        const product =
+            getProductById(productId);
 
         if (!product) {
-            showError("Product could not be found.");
             return;
         }
 
-        product.name = name;
-        product.category = category;
-        product.costPrice = costPrice;
-        product.sellingPrice = sellingPrice;
-        product.stock = stock;
-        product.lowStockLevel = lowStockLevel;
 
-        showToast("Product updated successfully.");
+        getElement("productId").value =
+            product.id;
 
-    } else {
-        appData.products.push({
-            id: generateId("PROD"),
-            name,
-            category,
-            costPrice,
-            sellingPrice,
-            stock,
-            lowStockLevel,
-            createdAt: new Date().toISOString()
-        });
+        getElement("productName").value =
+            product.name || "";
 
-        showToast("Product added successfully.");
+        getElement("productCategory").value =
+            product.category || "";
+
+        getElement("productStock").value =
+            product.stock ?? 0;
+
+        getElement("productCostPrice").value =
+            product.costPrice ?? 0;
+
+        getElement("productSellingPrice").value =
+            product.sellingPrice ?? 0;
+
+
+        getElement("productModalTitle").textContent =
+            "Edit Product";
     }
 
-    saveData();
-    closeModal("productModal");
-    renderAll();
-    updateSaleProductSuggestions();
+
+    openModal("productModal");
 }
 
 
-async function deleteProduct(productId) {
-    const product = getProductById(productId);
+function editProduct(id) {
+    openProductModal(id);
+}
 
-    if (!product) return;
 
-    const confirmed = await showConfirm(
-        "Delete Product?",
-        `Delete "${product.name}" from your products?`
-    );
+function deleteProduct(id) {
 
-    if (!confirmed) return;
+    const product =
+        getProductById(id);
 
-    appData.products = appData.products.filter(
-        item => item.id !== productId
-    );
+    if (!product) {
+        return;
+    }
+
+
+    const confirmed =
+        window.confirm(
+            `Delete "${product.name}"?`
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    appData.products =
+        appData.products.filter(
+            item => item.id !== id
+        );
+
 
     saveData();
-    renderAll();
-    updateSaleProductSuggestions();
 
-    showToast("Product deleted.");
+    refreshApplication();
+
+
+    showToast(
+        "Product Deleted",
+        `${product.name} was removed.`,
+        "success"
+    );
 }
 
 
 /* =========================================================
-   SALES
-   ========================================================= */
+   SALES MANAGEMENT
+========================================================= */
 
-function renderSales() {
-    const tbody = getEl("salesTableBody");
+function renderSales(searchTerm = "") {
 
-    if (!tbody) return;
+    const tbody =
+        getElement("salesTableBody");
 
-    const sales = [...appData.sales].sort(
-        (a, b) =>
-            new Date(b.date) - new Date(a.date)
-    );
+    const empty =
+        getElement("salesEmpty");
 
-    const revenue = sales.reduce(
-        (sum, sale) =>
-            sum + Number(sale.revenue || 0),
-        0
-    );
-
-    const profit = sales.reduce(
-        (sum, sale) =>
-            sum + Number(sale.profit || 0),
-        0
-    );
-
-    if (getEl("salesCount")) {
-        getEl("salesCount").textContent =
-            formatNumber(sales.length);
+    if (!tbody || !empty) {
+        return;
     }
 
-    if (getEl("salesRevenue")) {
-        getEl("salesRevenue").textContent =
-            formatMoney(revenue);
-    }
 
-    if (getEl("salesProfit")) {
-        getEl("salesProfit").textContent =
-            formatMoney(profit);
-    }
+    const search =
+        searchTerm
+            .trim()
+            .toLowerCase();
+
+
+    const sales =
+        [...appData.sales]
+            .sort(
+                (a, b) =>
+                    new Date(b.date) -
+                    new Date(a.date)
+            )
+            .filter(sale => {
+
+                if (!search) {
+                    return true;
+                }
+
+
+                const product =
+                    getProductById(
+                        sale.productId
+                    );
+
+
+                const customer =
+                    getCustomerById(
+                        sale.customerId
+                    );
+
+
+                const text =
+                    [
+                        sale.date,
+                        product
+                            ? product.name
+                            : "",
+                        customer
+                            ? customer.name
+                            : "Walk-in Customer"
+                    ]
+                        .join(" ")
+                        .toLowerCase();
+
+
+                return text.includes(search);
+            });
+
+
+    tbody.innerHTML = "";
+
 
     if (sales.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="7">
-                    <div class="empty-state">
-                        <div class="empty-icon">🛒</div>
-                        <h3>No sales recorded</h3>
-                        <p>Your sales will appear here after you record them.</p>
-                    </div>
-                </td>
-            </tr>
-        `;
+
+        empty.classList.add("show");
+
         return;
     }
 
-    tbody.innerHTML = sales
-        .map(sale => `
-            <tr>
-                <td>
-                    ${formatDate(sale.date)}
-                </td>
 
-                <td>
-                    <strong>
-                        ${escapeHTML(sale.productName)}
-                    </strong>
-                </td>
+    empty.classList.remove("show");
 
-                <td>
-                    ${formatNumber(sale.quantity)}
-                </td>
 
-                <td>
-                    ${formatMoney(sale.unitPrice)}
-                </td>
+    tbody.innerHTML =
+        sales.map(sale => {
 
-                <td>
-                    ${formatMoney(sale.revenue)}
-                </td>
+            const product =
+                getProductById(
+                    sale.productId
+                );
 
-                <td>
-                    <strong>
-                        ${formatMoney(sale.profit)}
-                    </strong>
-                </td>
 
-                <td>
-                    <button
-                        type="button"
-                        class="action-btn delete"
-                        data-action="delete-sale"
-                        data-id="${sale.id}"
-                    >
-                        Delete
-                    </button>
-                </td>
-            </tr>
-        `)
-        .join("");
-}
+            const customer =
+                getCustomerById(
+                    sale.customerId
+                );
 
-
-function openAddSaleModal() {
-    const form = getEl("saleForm");
-
-    if (form) {
-        form.reset();
-    }
-
-    if (getEl("availableStock")) {
-        getEl("availableStock").textContent =
-            "Available stock: 0";
-    }
-
-    resetSalePreview();
-
-    updateSaleProductSuggestions();
-
-    openModal("saleModal");
-}
-
-
-function updateSaleProductSuggestions() {
-    const datalist = getEl("productSuggestions");
-
-    if (!datalist) return;
-
-    datalist.innerHTML = appData.products
-        .map(product => `
-            <option value="${escapeHTML(product.name)}">
-        `)
-        .join("");
-}
-
-
-function updateSalePreview() {
-    const productInput = getEl("saleProduct");
-    const quantityInput = getEl("saleQuantity");
-
-    if (!productInput || !quantityInput) return;
-
-    const product = findProductByName(
-        productInput.value
-    );
-
-    const quantity = Number(
-        quantityInput.value
-    ) || 0;
-
-    if (!product) {
-        if (getEl("availableStock")) {
-            getEl("availableStock").textContent =
-                "Available stock: 0";
-        }
-
-        resetSalePreview();
-        return;
-    }
-
-    const price = Number(product.sellingPrice) || 0;
-    const cost = Number(product.costPrice) || 0;
-
-    if (getEl("availableStock")) {
-        getEl("availableStock").textContent =
-            `Available stock: ${formatNumber(product.stock)}`;
-    }
-
-    const total = price * quantity;
-    const profit = (price - cost) * quantity;
-
-    if (getEl("saleUnitPrice")) {
-        getEl("saleUnitPrice").textContent =
-            formatMoney(price);
-    }
-
-    if (getEl("saleTotal")) {
-        getEl("saleTotal").textContent =
-            formatMoney(total);
-    }
-
-    if (getEl("saleProfit")) {
-        getEl("saleProfit").textContent =
-            formatMoney(profit);
-    }
-}
-
-
-function resetSalePreview() {
-    if (getEl("saleUnitPrice")) {
-        getEl("saleUnitPrice").textContent =
-            formatMoney(0);
-    }
-
-    if (getEl("saleTotal")) {
-        getEl("saleTotal").textContent =
-            formatMoney(0);
-    }
-
-    if (getEl("saleProfit")) {
-        getEl("saleProfit").textContent =
-            formatMoney(0);
-    }
-}
-
-
-function saveSale(event) {
-    event.preventDefault();
-
-    const productName = getEl("saleProduct")
-        .value
-        .trim();
-
-    const quantity = Number(
-        getEl("saleQuantity").value
-    );
-
-    if (!productName) {
-        showError("Please select or enter a product.");
-        return;
-    }
-
-    if (
-        !Number.isFinite(quantity) ||
-        quantity <= 0
-    ) {
-        showError("Please enter a valid quantity.");
-        return;
-    }
-
-    const product = findProductByName(productName);
-
-    if (!product) {
-        showError(
-            "Product not found. Please select a product from your inventory."
-        );
-        return;
-    }
-
-    if (product.stock <= 0) {
-        showError(
-            "This product is currently out of stock."
-        );
-        return;
-    }
-
-    if (quantity > Number(product.stock)) {
-        showError(
-            `Only ${product.stock} unit(s) of this product are available.`
-        );
-        return;
-    }
-
-    const unitPrice = Number(
-        product.sellingPrice
-    );
-
-    const costPrice = Number(
-        product.costPrice
-    );
-
-    const revenue = unitPrice * quantity;
-    const cost = costPrice * quantity;
-    const profit = revenue - cost;
-
-    appData.sales.push({
-        id: generateId("SALE"),
-        productId: product.id,
-        productName: product.name,
-        quantity,
-        unitPrice,
-        costPrice,
-        revenue,
-        cost,
-        profit,
-        date: new Date().toISOString()
-    });
-
-    product.stock =
-        Number(product.stock) - quantity;
-
-    saveData();
-
-    closeModal("saleModal");
-
-    renderAll();
-    updateSaleProductSuggestions();
-
-    showToast("Sale recorded successfully.");
-}
-
-
-async function deleteSale(saleId) {
-    const sale = appData.sales.find(
-        item => item.id === saleId
-    );
-
-    if (!sale) return;
-
-    const confirmed = await showConfirm(
-        "Delete Sale?",
-        "The sale will be removed and the sold quantity will be returned to stock."
-    );
-
-    if (!confirmed) return;
-
-    const product = getProductById(
-        sale.productId
-    );
-
-    if (product) {
-        product.stock =
-            Number(product.stock || 0) +
-            Number(sale.quantity || 0);
-    }
-
-    appData.sales = appData.sales.filter(
-        item => item.id !== saleId
-    );
-
-    saveData();
-    renderAll();
-
-    showToast("Sale deleted and stock restored.");
-}
-
-
-/* =========================================================
-   EXPENSES
-   ========================================================= */
-
-function renderExpenses() {
-    const tbody = getEl("expensesTableBody");
-
-    if (!tbody) return;
-
-    const expenses = [...appData.expenses].sort(
-        (a, b) =>
-            new Date(b.date) - new Date(a.date)
-    );
-
-    const total = expenses.reduce(
-        (sum, expense) =>
-            sum + Number(expense.amount || 0),
-        0
-    );
-
-    if (getEl("expenseCount")) {
-        getEl("expenseCount").textContent =
-            formatNumber(expenses.length);
-    }
-
-    if (getEl("expenseTotal")) {
-        getEl("expenseTotal").textContent =
-            formatMoney(total);
-    }
-
-    if (expenses.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="5">
-                    <div class="empty-state">
-                        <div class="empty-icon">💳</div>
-                        <h3>No expenses recorded</h3>
-                        <p>Your business expenses will appear here.</p>
-                    </div>
-                </td>
-            </tr>
-        `;
-        return;
-    }
-
-    tbody.innerHTML = expenses
-        .map(expense => `
-            <tr>
-                <td>
-                    ${formatDate(expense.date)}
-                </td>
-
-                <td>
-                    <strong>
-                        ${escapeHTML(expense.description)}
-                    </strong>
-                </td>
-
-                <td>
-                    ${escapeHTML(expense.category)}
-                </td>
-
-                <td>
-                    ${formatMoney(expense.amount)}
-                </td>
-
-                <td>
-                    <button
-                        type="button"
-                        class="action-btn delete"
-                        data-action="delete-expense"
-                        data-id="${expense.id}"
-                    >
-                        Delete
-                    </button>
-                </td>
-            </tr>
-        `)
-        .join("");
-}
-
-
-function openAddExpenseModal() {
-    const form = getEl("expenseForm");
-
-    if (form) {
-        form.reset();
-    }
-
-    openModal("expenseModal");
-}
-
-
-function saveExpense(event) {
-    event.preventDefault();
-
-    const description = getEl("expenseDescription")
-        .value
-        .trim();
-
-    const category = getEl("expenseCategory")
-        .value;
-
-    const amount = Number(
-        getEl("expenseAmount").value
-    );
-
-    if (!description) {
-        showError(
-            "Please enter an expense description."
-        );
-        return;
-    }
-
-    if (!category) {
-        showError(
-            "Please select an expense category."
-        );
-        return;
-    }
-
-    if (
-        !Number.isFinite(amount) ||
-        amount <= 0
-    ) {
-        showError(
-            "Please enter a valid expense amount."
-        );
-        return;
-    }
-
-    appData.expenses.push({
-        id: generateId("EXP"),
-        description,
-        category,
-        amount,
-        date: new Date().toISOString()
-    });
-
-    saveData();
-
-    closeModal("expenseModal");
-
-    renderAll();
-
-    showToast("Expense recorded successfully.");
-}
-
-
-async function deleteExpense(expenseId) {
-    const expense = appData.expenses.find(
-        item => item.id === expenseId
-    );
-
-    if (!expense) return;
-
-    const confirmed = await showConfirm(
-        "Delete Expense?",
-        `Delete "${expense.description}" from your expenses?`
-    );
-
-    if (!confirmed) return;
-
-    appData.expenses =
-        appData.expenses.filter(
-            item => item.id !== expenseId
-        );
-
-    saveData();
-    renderAll();
-
-    showToast("Expense deleted.");
-}
-
-
-/* =========================================================
-   CUSTOMERS
-   ========================================================= */
-
-function renderCustomers() {
-    const tbody = getEl("customersTableBody");
-
-    if (!tbody) return;
-
-    if (appData.customers.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="5">
-                    <div class="empty-state">
-                        <div class="empty-icon">👥</div>
-                        <h3>No customers yet</h3>
-                        <p>Add your customers to keep their information organized.</p>
-                    </div>
-                </td>
-            </tr>
-        `;
-        return;
-    }
-
-    const customers = [...appData.customers].sort(
-        (a, b) =>
-            new Date(b.date) - new Date(a.date)
-    );
-
-    tbody.innerHTML = customers
-        .map(customer => `
-            <tr>
-                <td>
-                    <strong>
-                        ${escapeHTML(customer.name)}
-                    </strong>
-                </td>
-
-                <td>
-                    ${escapeHTML(customer.phone || "-")}
-                </td>
-
-                <td>
-                    ${escapeHTML(customer.address || "-")}
-                </td>
-
-                <td>
-                    ${formatDate(customer.date)}
-                </td>
-
-                <td>
-                    <button
-                        type="button"
-                        class="action-btn delete"
-                        data-action="delete-customer"
-                        data-id="${customer.id}"
-                    >
-                        Delete
-                    </button>
-                </td>
-            </tr>
-        `)
-        .join("");
-}
-
-
-function openAddCustomerModal() {
-    const form = getEl("customerForm");
-
-    if (form) {
-        form.reset();
-    }
-
-    openModal("customerModal");
-}
-
-
-function saveCustomer(event) {
-    event.preventDefault();
-
-    const name = getEl("customerName")
-        .value
-        .trim();
-
-    const phone = getEl("customerPhone")
-        .value
-        .trim();
-
-    const address = getEl("customerAddress")
-        .value
-        .trim();
-
-    if (!name) {
-        showError("Please enter the customer's name.");
-        return;
-    }
-
-    appData.customers.push({
-        id: generateId("CUST"),
-        name,
-        phone,
-        address,
-        date: new Date().toISOString()
-    });
-
-    saveData();
-
-    closeModal("customerModal");
-
-    renderAll();
-
-    showToast("Customer added successfully.");
-}
-
-
-async function deleteCustomer(customerId) {
-    const customer = appData.customers.find(
-        item => item.id === customerId
-    );
-
-    if (!customer) return;
-
-    const confirmed = await showConfirm(
-        "Delete Customer?",
-        `Delete "${customer.name}" from your customer list?`
-    );
-
-    if (!confirmed) return;
-
-    appData.customers =
-        appData.customers.filter(
-            item => item.id !== customerId
-        );
-
-    saveData();
-    renderAll();
-
-    showToast("Customer deleted.");
-}
-
-
-/* =========================================================
-   REPORTS
-   ========================================================= */
-
-function getDateRange(range) {
-    const now = new Date();
-
-    if (range === "today") {
-        const start = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            now.getDate()
-        );
-
-        const end = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            now.getDate() + 1
-        );
-
-        return { start, end };
-    }
-
-    if (range === "week") {
-        const day = now.getDay();
-
-        const start = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            now.getDate() - day
-        );
-
-        const end = new Date(
-            start.getFullYear(),
-            start.getMonth(),
-            start.getDate() + 7
-        );
-
-        return { start, end };
-    }
-
-    if (range === "month") {
-        const start = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            1
-        );
-
-        const end = new Date(
-            now.getFullYear(),
-            now.getMonth() + 1,
-            1
-        );
-
-        return { start, end };
-    }
-
-    return {
-        start: null,
-        end: null
-    };
-}
-
-
-function filterByDateRange(items, range) {
-    if (range === "all") {
-        return items;
-    }
-
-    const { start, end } =
-        getDateRange(range);
-
-    return items.filter(item => {
-        const date = getDateValue(item.date);
-
-        if (!date) return false;
-
-        return date >= start && date < end;
-    });
-}
-
-
-function renderReports() {
-    const sales = filterByDateRange(
-        appData.sales,
-        currentReportRange
-    );
-
-    const expenses = filterByDateRange(
-        appData.expenses,
-        currentReportRange
-    );
-
-    const revenue = sales.reduce(
-        (sum, sale) =>
-            sum + Number(sale.revenue || 0),
-        0
-    );
-
-    const grossProfit = sales.reduce(
-        (sum, sale) =>
-            sum + Number(sale.profit || 0),
-        0
-    );
-
-    const expenseTotal = expenses.reduce(
-        (sum, expense) =>
-            sum + Number(expense.amount || 0),
-        0
-    );
-
-    const netProfit =
-        grossProfit - expenseTotal;
-
-    if (getEl("reportRevenue")) {
-        getEl("reportRevenue").textContent =
-            formatMoney(revenue);
-    }
-
-    if (getEl("reportGross")) {
-        getEl("reportGross").textContent =
-            formatMoney(grossProfit);
-    }
-
-    if (getEl("reportExpenses")) {
-        getEl("reportExpenses").textContent =
-            formatMoney(expenseTotal);
-    }
-
-    if (getEl("reportNet")) {
-        getEl("reportNet").textContent =
-            formatMoney(netProfit);
-    }
-
-    renderTopProducts(sales);
-    renderExpenseBreakdown(expenses);
-
-    document.querySelectorAll(".filter-btn")
-        .forEach(button => {
-            button.classList.toggle(
-                "active",
-                button.dataset.range ===
-                    currentReportRange
-            );
-        });
-}
-
-
-function renderTopProducts(sales) {
-    const container =
-        getEl("topProductsContainer");
-
-    if (!container) return;
-
-    const productMap = {};
-
-    sales.forEach(sale => {
-        const key = sale.productId || sale.productName;
-
-        if (!productMap[key]) {
-            productMap[key] = {
-                name: sale.productName,
-                quantity: 0,
-                revenue: 0,
-                profit: 0
-            };
-        }
-
-        productMap[key].quantity +=
-            Number(sale.quantity || 0);
-
-        productMap[key].revenue +=
-            Number(sale.revenue || 0);
-
-        productMap[key].profit +=
-            Number(sale.profit || 0);
-    });
-
-    const products = Object.values(productMap)
-        .sort((a, b) => b.profit - a.profit)
-        .slice(0, 5);
-
-    if (products.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-icon">📊</div>
-                <h3>No product data</h3>
-                <p>Product performance will appear here.</p>
-            </div>
-        `;
-        return;
-    }
-
-    container.innerHTML = products
-        .map((product, index) => `
-            <div class="report-item">
-                <div class="report-rank">
-                    ${index + 1}
-                </div>
-
-                <div class="report-info">
-                    <strong>
-                        ${escapeHTML(product.name)}
-                    </strong>
-
-                    <small>
-                        ${formatNumber(product.quantity)}
-                        units sold
-                    </small>
-                </div>
-
-                <div class="report-value">
-                    <strong>
-                        ${formatMoney(product.profit)}
-                    </strong>
-
-                    <small>
-                        Revenue:
-                        ${formatMoney(product.revenue)}
-                    </small>
-                </div>
-            </div>
-        `)
-        .join("");
-}
-
-
-function renderExpenseBreakdown(expenses) {
-    const container =
-        getEl("expenseBreakdownContainer");
-
-    if (!container) return;
-
-    const categoryMap = {};
-
-    expenses.forEach(expense => {
-        const category =
-            expense.category || "Other";
-
-        if (!categoryMap[category]) {
-            categoryMap[category] = 0;
-        }
-
-        categoryMap[category] +=
-            Number(expense.amount || 0);
-    });
-
-    const entries = Object.entries(categoryMap)
-        .sort((a, b) => b[1] - a[1]);
-
-    if (entries.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-icon">💳</div>
-                <h3>No expense data</h3>
-                <p>Expense breakdown will appear here.</p>
-            </div>
-        `;
-        return;
-    }
-
-    const total = entries.reduce(
-        (sum, [, amount]) =>
-            sum + amount,
-        0
-    );
-
-    container.innerHTML = entries
-        .map(([category, amount]) => {
-            const percentage =
-                total > 0
-                    ? (amount / total) * 100
-                    : 0;
 
             return `
-                <div class="expense-breakdown-item">
-                    <div class="expense-breakdown-header">
+                <tr>
+
+                    <td>
+                        ${formatDate(
+                            sale.date
+                        )}
+                    </td>
+
+                    <td>
                         <strong>
-                            ${escapeHTML(category)}
+                            ${escapeHTML(
+                                product
+                                    ? product.name
+                                    : "Deleted Product"
+                            )}
                         </strong>
+                    </td>
 
-                        <span>
-                            ${formatMoney(amount)}
+                    <td>
+                        ${escapeHTML(
+                            customer
+                                ? customer.name
+                                : "Walk-in Customer"
+                        )}
+                    </td>
+
+                    <td>
+                        ${formatNumber(
+                            sale.quantity
+                        )}
+                    </td>
+
+                    <td>
+                        ${formatCurrency(
+                            sale.total
+                        )}
+                    </td>
+
+                    <td>
+                        <span
+                            class="badge ${
+                                Number(
+                                    sale.profit
+                                ) >= 0
+                                    ? "badge-success"
+                                    : "badge-danger"
+                            }"
+                        >
+                            ${formatCurrency(
+                                sale.profit
+                            )}
                         </span>
-                    </div>
+                    </td>
 
-                    <div class="progress-bar">
-                        <div
-                            class="progress-fill"
-                            style="width:${percentage.toFixed(2)}%"
-                        ></div>
-                    </div>
+                    <td>
 
-                    <small>
-                        ${percentage.toFixed(1)}%
-                    </small>
-                </div>
+                        <div class="action-buttons">
+
+                            <button
+                                type="button"
+                                class="action-btn view"
+                                title="View receipt"
+                                onclick="viewReceipt('${sale.id}')"
+                            >
+                                🧾
+                            </button>
+
+                            <button
+                                type="button"
+                                class="action-btn delete"
+                                title="Delete sale"
+                                onclick="deleteSale('${sale.id}')"
+                            >
+                                🗑️
+                            </button>
+
+                        </div>
+
+                    </td>
+
+                </tr>
             `;
         })
         .join("");
 }
 
 
-/* =========================================================
-   SETTINGS
-   ========================================================= */
+function openSaleModal(saleId = "") {
 
-function loadBusinessSettings() {
-    if (getEl("businessName")) {
-        getEl("businessName").value =
-            appData.business.name || "";
-    }
+    const modal =
+        getElement("saleModal");
 
-    if (getEl("businessPhone")) {
-        getEl("businessPhone").value =
-            appData.business.phone || "";
-    }
+    const form =
+        getElement("saleForm");
 
-    if (getEl("businessAddress")) {
-        getEl("businessAddress").value =
-            appData.business.address || "";
-    }
-
-    if (getEl("headerBusinessName")) {
-        getEl("headerBusinessName").textContent =
-            appData.business.name ||
-            "My Business";
-    }
-}
-
-
-function saveBusinessSettings(event) {
-    event.preventDefault();
-
-    const name = getEl("businessName")
-        .value
-        .trim();
-
-    const phone = getEl("businessPhone")
-        .value
-        .trim();
-
-    const address = getEl("businessAddress")
-        .value
-        .trim();
-
-    if (!name) {
-        showError(
-            "Please enter your business name."
-        );
+    if (!modal || !form) {
         return;
     }
 
-    appData.business = {
-        name,
-        phone,
-        address
-    };
 
-    saveData();
-    loadBusinessSettings();
-
-    showToast(
-        "Business settings saved successfully."
-    );
-}
+    form.reset();
 
 
-/* =========================================================
-   EXPORT / RESTORE
-   ========================================================= */
+    getElement("saleId").value = "";
 
-function exportData() {
-    try {
-        const data = JSON.stringify(
-            appData,
-            null,
-            2
-        );
+    getElement("saleDate").value =
+        getToday();
 
-        const blob = new Blob(
-            [data],
-            {
-                type: "application/json"
-            }
-        );
+    getElement("saleQuantity").value =
+        1;
 
-        const url =
-            URL.createObjectURL(blob);
-
-        const link =
-            document.createElement("a");
-
-        const date =
-            new Date()
-                .toISOString()
-                .slice(0, 10);
-
-        link.href = url;
-
-        link.download =
-            `business-profit-analyzer-backup-${date}.json`;
-
-        document.body.appendChild(link);
-
-        link.click();
-
-        link.remove();
-
-        URL.revokeObjectURL(url);
-
-        showToast(
-            "Backup exported successfully."
-        );
-
-    } catch (error) {
-        console.error(error);
-
-        showError(
-            "Unable to export your data."
-        );
-    }
-}
+    getElement("salePrice").value =
+        "";
 
 
-function triggerRestore() {
-    const fileInput = getEl("restoreFile");
-
-    if (fileInput) {
-        fileInput.click();
-    }
-}
+    getElement("saleTotalPreview").textContent =
+        formatCurrency(0);
 
 
-function restoreData(event) {
-    const file =
-        event.target.files &&
-        event.target.files[0];
+    getElement("saleModalTitle").textContent =
+        "Record Sale";
 
-    if (!file) return;
 
-    const reader =
-        new FileReader();
+    populateSaleProducts();
 
-    reader.onload = async function () {
-        try {
-            const imported =
-                JSON.parse(reader.result);
+    populateSaleCustomers();
 
-            if (
-                !imported ||
-                typeof imported !== "object"
-            ) {
-                throw new Error(
-                    "Invalid backup file."
-                );
-            }
 
-            const confirmed =
-                await showConfirm(
-                    "Restore Backup?",
-                    "Restoring this backup will replace the current business data on this device."
-                );
+    if (saleId) {
 
-            if (!confirmed) {
-                event.target.value = "";
-                return;
-            }
-
-            appData = {
-                business: {
-                    ...defaultData.business,
-                    ...(imported.business || {})
-                },
-                products: Array.isArray(
-                    imported.products
-                )
-                    ? imported.products
-                    : [],
-                sales: Array.isArray(
-                    imported.sales
-                )
-                    ? imported.sales
-                    : [],
-                expenses: Array.isArray(
-                    imported.expenses
-                )
-                    ? imported.expenses
-                    : [],
-                customers: Array.isArray(
-                    imported.customers
-                )
-                    ? imported.customers
-                    : []
-            };
-
-            saveData();
-            renderAll();
-            loadBusinessSettings();
-            updateSaleProductSuggestions();
-
-            showSuccess(
-                "Your backup has been restored successfully."
+        const sale =
+            appData.sales.find(
+                item => item.id === saleId
             );
 
-        } catch (error) {
-            console.error(error);
-
-            showError(
-                "This file is not a valid Profit Analyzer backup."
-            );
+        if (!sale) {
+            return;
         }
 
-        event.target.value = "";
-    };
 
-    reader.onerror = function () {
-        showError(
-            "Could not read the selected backup file."
-        );
+        getElement("saleId").value =
+            sale.id;
 
-        event.target.value = "";
-    };
+        getElement("saleDate").value =
+            sale.date;
 
-    reader.readAsText(file);
+        getElement("saleProduct").value =
+            sale.productId;
+
+        getElement("saleCustomer").value =
+            sale.customerId || "";
+
+        getElement("saleQuantity").value =
+            sale.quantity;
+
+        getElement("salePrice").value =
+            sale.price;
+
+        getElement("saleNotes").value =
+            sale.notes || "";
+
+
+        getElement("saleModalTitle").textContent =
+            "Edit Sale";
+
+
+        updateSaleTotalPreview();
+    }
+
+
+    openModal("saleModal");
 }
 
 
-async function clearAllData() {
+function populateSaleProducts() {
+
+    const select =
+        getElement("saleProduct");
+
+    if (!select) {
+        return;
+    }
+
+
+    const currentValue =
+        select.value;
+
+
+    select.innerHTML = `
+        <option value="">
+            Select product
+        </option>
+    `;
+
+
+    appData.products.forEach(product => {
+
+        const option =
+            document.createElement("option");
+
+        option.value =
+            product.id;
+
+        option.textContent =
+            `${product.name} — ${formatCurrency(
+                product.sellingPrice
+            )}`;
+
+        select.appendChild(option);
+    });
+
+
+    if (
+        appData.products.some(
+            product =>
+                product.id ===
+                currentValue
+        )
+    ) {
+        select.value =
+            currentValue;
+    }
+}
+
+
+function populateSaleCustomers() {
+
+    const select =
+        getElement("saleCustomer");
+
+    if (!select) {
+        return;
+    }
+
+
+    const currentValue =
+        select.value;
+
+
+    select.innerHTML = `
+        <option value="">
+            Walk-in Customer
+        </option>
+    `;
+
+
+    appData.customers.forEach(customer => {
+
+        const option =
+            document.createElement("option");
+
+        option.value =
+            customer.id;
+
+        option.textContent =
+            customer.name;
+
+        select.appendChild(option);
+    });
+
+
+    if (
+        appData.customers.some(
+            customer =>
+                customer.id ===
+                currentValue
+        )
+    ) {
+        select.value =
+            currentValue;
+    }
+}
+
+
+function updateSalePriceFromProduct() {
+
+    const productSelect =
+        getElement("saleProduct");
+
+    const priceInput =
+        getElement("salePrice");
+
+
+    if (!productSelect || !priceInput) {
+        return;
+    }
+
+
+    const product =
+        getProductById(
+            productSelect.value
+        );
+
+
+    if (!product) {
+        priceInput.value = "";
+
+        updateSaleTotalPreview();
+
+        return;
+    }
+
+
+    priceInput.value =
+        product.sellingPrice;
+
+
+    updateSaleTotalPreview();
+}
+
+
+function updateSaleTotalPreview() {
+
+    const quantity =
+        Number(
+            getElement("saleQuantity")?.value
+        ) || 0;
+
+
+    const price =
+        Number(
+            getElement("salePrice")?.value
+        ) || 0;
+
+
+    const total =
+        quantity * price;
+
+
+    const preview =
+        getElement("saleTotalPreview");
+
+
+    if (preview) {
+        preview.textContent =
+            formatCurrency(total);
+    }
+}
+
+
+function deleteSale(id) {
+
+    const sale =
+        appData.sales.find(
+            item => item.id === id
+        );
+
+    if (!sale) {
+        return;
+    }
+
+
+    const product =
+        getProductById(
+            sale.productId
+        );
+
+
     const confirmed =
-        await showConfirm(
-            "Clear All Data?",
-            "This will permanently remove all products, sales, expenses, customers and business settings from this device."
+        window.confirm(
+            "Delete this sale?"
         );
 
-    if (!confirmed) return;
 
-    appData =
-        JSON.parse(
-            JSON.stringify(defaultData)
+    if (!confirmed) {
+        return;
+    }
+
+
+    /*
+       Return sold quantity to stock.
+    */
+    if (product) {
+
+        product.stock =
+            Number(product.stock || 0) +
+            Number(sale.quantity || 0);
+    }
+
+
+    appData.sales =
+        appData.sales.filter(
+            item => item.id !== id
         );
+
 
     saveData();
 
-    currentReportRange = "all";
+    refreshApplication();
 
-    renderAll();
-    loadBusinessSettings();
-    updateSaleProductSuggestions();
 
-    showSuccess(
-        "All business data has been cleared."
+    showToast(
+        "Sale Deleted",
+        "The sale was removed and stock was restored.",
+        "success"
     );
 }
 
 
 /* =========================================================
-   PRINT REPORT
-   ========================================================= */
+   EXPENSE MANAGEMENT
+========================================================= */
 
-function printReport() {
-    showPage("reports");
+function renderExpenses(searchTerm = "") {
 
-    setTimeout(() => {
-        window.print();
-    }, 300);
+    const tbody =
+        getElement("expensesTableBody");
+
+    const empty =
+        getElement("expensesEmpty");
+
+    if (!tbody || !empty) {
+        return;
+    }
+
+
+    const search =
+        searchTerm
+            .trim()
+            .toLowerCase();
+
+
+    const expenses =
+        [...appData.expenses]
+            .sort(
+                (a, b) =>
+                    new Date(b.date) -
+                    new Date(a.date)
+            )
+            .filter(expense => {
+
+                if (!search) {
+                    return true;
+                }
+
+
+                const text =
+                    [
+                        expense.name,
+                        expense.category,
+                        expense.notes,
+                        expense.date
+                    ]
+                        .join(" ")
+                        .toLowerCase();
+
+
+                return text.includes(search);
+            });
+
+
+    tbody.innerHTML = "";
+
+
+    if (expenses.length === 0) {
+
+        empty.classList.add("show");
+
+        return;
+    }
+
+
+    empty.classList.remove("show");
+
+
+    tbody.innerHTML =
+        expenses.map(expense => {
+
+            return `
+                <tr>
+
+                    <td>
+                        ${formatDate(
+                            expense.date
+                        )}
+                    </td>
+
+                    <td>
+                        <strong>
+                            ${escapeHTML(
+                                expense.name
+                            )}
+                        </strong>
+                    </td>
+
+                    <td>
+                        ${escapeHTML(
+                            expense.category ||
+                            "Other"
+                        )}
+                    </td>
+
+                    <td>
+                        <strong>
+                            ${formatCurrency(
+                                expense.amount
+                            )}
+                        </strong>
+                    </td>
+
+                    <td>
+                        ${escapeHTML(
+                            expense.notes ||
+                            "---"
+                        )}
+                    </td>
+
+                    <td>
+
+                        <div class="action-buttons">
+
+                            <button
+                                type="button"
+                                class="action-btn edit"
+                                title="Edit expense"
+                                onclick="editExpense('${expense.id}')"
+                            >
+                                ✏️
+                            </button>
+
+                            <button
+                                type="button"
+                                class="action-btn delete"
+                                title="Delete expense"
+                                onclick="deleteExpense('${expense.id}')"
+                            >
+                                🗑️
+                            </button>
+
+                        </div>
+
+                    </td>
+
+                </tr>
+            `;
+        })
+        .join("");
 }
 
 
-/* =========================================================
-   RENDER EVERYTHING
-   ========================================================= */
+function openExpenseModal(expenseId = "") {
 
-function renderAll() {
-    renderDashboard();
-    renderProducts();
-    renderSales();
-    renderExpenses();
-    renderCustomers();
-    renderReports();
+    const modal =
+        getElement("expenseModal");
+
+    const form =
+        getElement("expenseForm");
+
+    if (!modal || !form) {
+        return;
+    }
+
+
+    form.reset();
+
+
+    getElement("expenseId").value = "";
+
+    getElement("expenseDate").value =
+        getToday();
+
+
+    getElement("expenseModalTitle").textContent =
+        "Add Expense";
+
+
+    if (expenseId) {
+
+        const expense =
+            appData.expenses.find(
+                item =>
+                    item.id === expenseId
+            );
+
+        if (!expense) {
+            return;
+        }
+
+
+        getElement("expenseId").value =
+            expense.id;
+
+        getElement("expenseDate").value =
+            expense.date;
+
+        getElement("expenseName").value =
+            expense.name;
+
+        getElement("expenseCategory").value =
+            expense.category || "Other";
+
+        getElement("expenseAmount").value =
+            expense.amount;
+
+        getElement("expenseNotes").value =
+            expense.notes || "";
+
+
+        getElement("expenseModalTitle").textContent =
+            "Edit Expense";
+    }
+
+
+    openModal("expenseModal");
 }
 
 
-/* =========================================================
-   EVENT DELEGATION
-   ========================================================= */
+function editExpense(id) {
+    openExpenseModal(id);
+}
 
-function handleActionClick(event) {
-    const button =
-        event.target.closest(
-            "[data-action]"
+
+function deleteExpense(id) {
+
+    const expense =
+        appData.expenses.find(
+            item => item.id === id
         );
 
-    if (!button) return;
-
-    const action =
-        button.dataset.action;
-
-    const id =
-        button.dataset.id;
-
-    if (action === "edit-product") {
-        openEditProductModal(id);
+    if (!expense) {
+        return;
     }
 
-    if (action === "delete-product") {
-        deleteProduct(id);
+
+    const confirmed =
+        window.confirm(
+            `Delete "${expense.name}"?`
+        );
+
+
+    if (!confirmed) {
+        return;
     }
 
-    if (action === "delete-sale") {
-        deleteSale(id);
-    }
 
-    if (action === "delete-expense") {
-        deleteExpense(id);
-    }
+    appData.expenses =
+        appData.expenses.filter(
+            item => item.id !== id
+        );
 
-    if (action === "delete-customer") {
-        deleteCustomer(id);
-    }
+
+    saveData();
+
+    refreshApplication();
+
+
+    showToast(
+        "Expense Deleted",
+        "The expense was removed.",
+        "success"
+    );
 }
 
 
 /* =========================================================
-   EVENT LISTENERS
-   ========================================================= */
+   CUSTOMER MANAGEMENT
+========================================================= */
 
-function initializeEventListeners() {
+function renderCustomers(searchTerm = "") {
 
-    /* ---------- Navigation ---------- */
+    const tbody =
+        getElement("customersTableBody");
 
-    document.querySelectorAll(".nav-item")
-        .forEach(button => {
-            button.addEventListener(
-                "click",
-                () => {
-                    showPage(
-                        button.dataset.page
-                    );
-                }
-            );
+    const empty =
+        getElement("customersEmpty");
+
+    if (!tbody || !empty) {
+        return;
+    }
+
+
+    const search =
+        searchTerm
+            .trim()
+            .toLowerCase();
+
+
+    const customers =
+        appData.customers.filter(customer => {
+
+            if (!search) {
+                return true;
+            }
+
+
+            const text =
+                [
+                    customer.name,
+                    customer.phone,
+                    customer.email,
+                    customer.address
+                ]
+                    .join(" ")
+                    .toLowerCase();
+
+
+            return text.includes(search);
         });
 
 
-    /* ---------- Mobile menu ---------- */
+    tbody.innerHTML = "";
 
-    const menuToggle =
-        getEl("menuToggle");
 
-    if (menuToggle) {
-        menuToggle.addEventListener(
-            "click",
-            toggleMobileMenu
-        );
+    if (customers.length === 0) {
+
+        empty.classList.add("show");
+
+        return;
     }
 
 
-    /* ---------- Product ---------- */
+    empty.classList.remove("show");
 
-    const addProductBtn =
-        getEl("addProductBtn");
 
-    if (addProductBtn) {
-        addProductBtn.addEventListener(
-            "click",
-            openAddProductModal
-        );
+    tbody.innerHTML =
+        customers.map(customer => {
+
+            return `
+                <tr>
+
+                    <td>
+                        <strong>
+                            ${escapeHTML(
+                                customer.name
+                            )}
+                        </strong>
+                    </td>
+
+                    <td>
+                        ${escapeHTML(
+                            customer.phone ||
+                            "---"
+                        )}
+                    </td>
+
+                    <td>
+                        ${escapeHTML(
+                            customer.email ||
+                            "---"
+                        )}
+                    </td>
+
+                    <td>
+                        ${escapeHTML(
+                            customer.address ||
+                            "---"
+                        )}
+                    </td>
+
+                    <td>
+
+                        <div class="action-buttons">
+
+                            <button
+                                type="button"
+                                class="action-btn edit"
+                                title="Edit customer"
+                                onclick="editCustomer('${customer.id}')"
+                            >
+                                ✏️
+                            </button>
+
+                            <button
+                                type="button"
+                                class="action-btn delete"
+                                title="Delete customer"
+                                onclick="deleteCustomer('${customer.id}')"
+                            >
+                                🗑️
+                            </button>
+
+                        </div>
+
+                    </td>
+
+                </tr>
+            `;
+        })
+        .join("");
+}
+
+
+function openCustomerModal(customerId = "") {
+
+    const modal =
+        getElement("customerModal");
+
+    const form =
+        getElement("customerForm");
+
+    if (!modal || !form) {
+        return;
     }
+
+
+    form.reset();
+
+
+    getElement("customerId").value =
+        "";
+
+
+    getElement("customerModalTitle").textContent =
+        "Add Customer";
+
+
+    if (customerId) {
+
+        const customer =
+            getCustomerById(
+                customerId
+            );
+
+        if (!customer) {
+            return;
+        }
+
+
+        getElement("customerId").value =
+            customer.id;
+
+        getElement("customerName").value =
+            customer.name || "";
+
+        getElement("customerPhone").value =
+            customer.phone || "";
+
+        getElement("customerEmail").value =
+            customer.email || "";
+
+        getElement("customerAddress").value =
+            customer.address || "";
+
+
+        getElement("customerModalTitle").textContent =
+            "Edit Customer";
+    }
+
+
+    openModal("customerModal");
+}
+
+
+function editCustomer(id) {
+    openCustomerModal(id);
+}
+
+
+function deleteCustomer(id) {
+
+    const customer =
+        getCustomerById(id);
+
+    if (!customer) {
+        return;
+    }
+
+
+    const confirmed =
+        window.confirm(
+            `Delete "${customer.name}"?`
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    appData.customers =
+        appData.customers.filter(
+            item => item.id !== id
+        );
+
+
+    saveData();
+
+    refreshApplication();
+
+
+    showToast(
+        "Customer Deleted",
+        `${customer.name} was removed.`,
+        "success"
+    );
+}
+
+
+/* =========================================================
+   FORMS
+========================================================= */
+
+function initializeForms() {
 
     const productForm =
-        getEl("productForm");
-
-    if (productForm) {
-        productForm.addEventListener(
-            "submit",
-            saveProduct
-        );
-    }
-
-    const productSearch =
-        getEl("productSearch");
-
-    if (productSearch) {
-        productSearch.addEventListener(
-            "input",
-            renderProducts
-        );
-    }
-
-
-    /* ---------- Sales ---------- */
-
-    const addSaleBtn =
-        getEl("addSaleBtn");
-
-    if (addSaleBtn) {
-        addSaleBtn.addEventListener(
-            "click",
-            openAddSaleModal
-        );
-    }
+        getElement("productForm");
 
     const saleForm =
-        getEl("saleForm");
-
-    if (saleForm) {
-        saleForm.addEventListener(
-            "submit",
-            saveSale
-        );
-    }
-
-    const saleProduct =
-        getEl("saleProduct");
-
-    const saleQuantity =
-        getEl("saleQuantity");
-
-    if (saleProduct) {
-        saleProduct.addEventListener(
-            "input",
-            updateSalePreview
-        );
-
-        saleProduct.addEventListener(
-            "change",
-            updateSalePreview
-        );
-    }
-
-    if (saleQuantity) {
-        saleQuantity.addEventListener(
-            "input",
-            updateSalePreview
-        );
-    }
-
-
-    /* ---------- Expenses ---------- */
-
-    const addExpenseBtn =
-        getEl("addExpenseBtn");
-
-    if (addExpenseBtn) {
-        addExpenseBtn.addEventListener(
-            "click",
-            openAddExpenseModal
-        );
-    }
+        getElement("saleForm");
 
     const expenseForm =
-        getEl("expenseForm");
-
-    if (expenseForm) {
-        expenseForm.addEventListener(
-            "submit",
-            saveExpense
-        );
-    }
-
-
-    /* ---------- Customers ---------- */
-
-    const addCustomerBtn =
-        getEl("addCustomerBtn");
-
-    if (addCustomerBtn) {
-        addCustomerBtn.addEventListener(
-            "click",
-            openAddCustomerModal
-        );
-    }
+        getElement("expenseForm");
 
     const customerForm =
-        getEl("customerForm");
+        getElement("customerForm");
+
+
+    /* PRODUCT */
+
+    if (productForm) {
+
+        productForm.addEventListener(
+            "submit",
+            event => {
+
+                event.preventDefault();
+
+                saveProduct();
+            }
+        );
+    }
+
+
+    /* SALE */
+
+    if (saleForm) {
+
+        saleForm.addEventListener(
+            "submit",
+            event => {
+
+                event.preventDefault();
+
+                saveSale();
+            }
+        );
+    }
+
+
+    /* EXPENSE */
+
+    if (expenseForm) {
+
+        expenseForm.addEventListener(
+            "submit",
+            event => {
+
+                event.preventDefault();
+
+                saveExpense();
+            }
+        );
+    }
+
+
+    /* CUSTOMER */
 
     if (customerForm) {
+
         customerForm.addEventListener(
             "submit",
-            saveCustomer
+            event => {
+
+                event.preventDefault();
+
+                saveCustomer();
+            }
         );
     }
 
 
-    /* ---------- Report filters ---------- */
+    const saleProduct =
+        getElement("saleProduct");
 
-    document.querySelectorAll(".filter-btn")
-        .forEach(button => {
-            button.addEventListener(
-                "click",
-                () => {
-                    currentReportRange =
-                        button.dataset.range ||
-                        "all";
+    const saleQuantity =
+        getElement("saleQuantity");
 
-                    renderReports();
-                }
-            );
-        });
+    const salePrice =
+        getElement("salePrice");
 
 
-    /* ---------- Settings ---------- */
+    if (saleProduct) {
 
-    const businessForm =
-        getEl("businessForm");
-
-    if (businessForm) {
-        businessForm.addEventListener(
-            "submit",
-            saveBusinessSettings
-        );
-    }
-
-    const exportDataBtn =
-        getEl("exportDataBtn");
-
-    if (exportDataBtn) {
-        exportDataBtn.addEventListener(
-            "click",
-            exportData
-        );
-    }
-
-    const restoreDataBtn =
-        getEl("restoreDataBtn");
-
-    if (restoreDataBtn) {
-        restoreDataBtn.addEventListener(
-            "click",
-            triggerRestore
-        );
-    }
-
-    const restoreFile =
-        getEl("restoreFile");
-
-    if (restoreFile) {
-        restoreFile.addEventListener(
+        saleProduct.addEventListener(
             "change",
-            restoreData
-        );
-    }
-
-    const clearDataBtn =
-        getEl("clearDataBtn");
-
-    if (clearDataBtn) {
-        clearDataBtn.addEventListener(
-            "click",
-            clearAllData
+            updateSalePriceFromProduct
         );
     }
 
 
-    /* ---------- Print ---------- */
+    if (saleQuantity) {
 
-    const printReportBtn =
-        getEl("printReportBtn");
-
-    if (printReportBtn) {
-        printReportBtn.addEventListener(
-            "click",
-            printReport
+        saleQuantity.addEventListener(
+            "input",
+            updateSaleTotalPreview
         );
     }
 
 
-    /* ---------- Modal close buttons ---------- */
+    if (salePrice) {
+
+        salePrice.addEventListener(
+            "input",
+            updateSaleTotalPreview
+        );
+    }
+}
+
+
+/* =========================================================
+   SAVE PRODUCT
+========================================================= */
+
+function saveProduct() {
+
+    const id =
+        getElement("productId").value.trim();
+
+    const name =
+        getElement("productName").value.trim();
+
+    const category =
+        getElement("productCategory").value.trim();
+
+    const stock =
+        Number(
+            getElement("productStock").value
+        );
+
+    const costPrice =
+        Number(
+            getElement("productCostPrice").value
+        );
+
+    const sellingPrice =
+        Number(
+            getElement("productSellingPrice").value
+        );
+
+
+    if (!name) {
+
+        showToast(
+            "Missing Information",
+            "Enter a product name.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    if (
+        !Number.isFinite(stock) ||
+        stock < 0
+    ) {
+
+        showToast(
+            "Invalid Stock",
+            "Enter a valid stock quantity.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    if (
+        !Number.isFinite(costPrice) ||
+        costPrice < 0
+    ) {
+
+        showToast(
+            "Invalid Cost Price",
+            "Enter a valid cost price.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    if (
+        !Number.isFinite(sellingPrice) ||
+        sellingPrice < 0
+    ) {
+
+        showToast(
+            "Invalid Selling Price",
+            "Enter a valid selling price.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    if (id) {
+
+        const product =
+            getProductById(id);
+
+        if (!product) {
+            return;
+        }
+
+
+        product.name =
+            name;
+
+        product.category =
+            category;
+
+        product.stock =
+            stock;
+
+        product.costPrice =
+            costPrice;
+
+        product.sellingPrice =
+            sellingPrice;
+
+
+        saveData();
+
+        refreshApplication();
+
+        closeModal("productModal");
+
+
+        showToast(
+            "Product Updated",
+            `${name} was updated successfully.`,
+            "success"
+        );
+
+        return;
+    }
+
+
+    appData.products.push({
+
+        id: generateId("product"),
+
+        name,
+
+        category,
+
+        stock,
+
+        costPrice,
+
+        sellingPrice,
+
+        createdAt:
+            new Date().toISOString()
+    });
+
+
+    saveData();
+
+    refreshApplication();
+
+    closeModal("productModal");
+
+
+    showToast(
+        "Product Added",
+        `${name} was added successfully.`,
+        "success"
+    );
+}
+
+
+/* =========================================================
+   SAVE SALE
+========================================================= */
+
+function saveSale() {
+
+    const id =
+        getElement("saleId").value.trim();
+
+    const date =
+        getElement("saleDate").value;
+
+    const productId =
+        getElement("saleProduct").value;
+
+    const customerId =
+        getElement("saleCustomer").value;
+
+    const quantity =
+        Number(
+            getElement("saleQuantity").value
+        );
+
+    const price =
+        Number(
+            getElement("salePrice").value
+        );
+
+    const notes =
+        getElement("saleNotes").value.trim();
+
+
+    if (!date) {
+
+        showToast(
+            "Missing Date",
+            "Select the sale date.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    const product =
+        getProductById(productId);
+
+
+    if (!product) {
+
+        showToast(
+            "Product Required",
+            "Select a valid product.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    if (
+        !Number.isFinite(quantity) ||
+        quantity <= 0
+    ) {
+
+        showToast(
+            "Invalid Quantity",
+            "Enter a valid quantity.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    if (
+        !Number.isFinite(price) ||
+        price < 0
+    ) {
+
+        showToast(
+            "Invalid Price",
+            "Enter a valid selling price.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    const total =
+        quantity * price;
+
+
+    /*
+       EDITING EXISTING SALE
+    */
+
+    if (id) {
+
+        const sale =
+            appData.sales.find(
+                item => item.id === id
+            );
+
+
+        if (!sale) {
+            return;
+        }
+
+
+        /*
+           Restore the old quantity first.
+        */
+
+        const oldProduct =
+            getProductById(
+                sale.productId
+            );
+
+
+        if (oldProduct) {
+
+            oldProduct.stock =
+                Number(
+                    oldProduct.stock || 0
+                ) +
+                Number(
+                    sale.quantity || 0
+                );
+        }
+
+
+        /*
+           Check the new quantity.
+        */
+
+        if (
+            product.stock <
+            quantity
+        ) {
+
+            /*
+               Restore the original stock
+               because the sale cannot be updated.
+            */
+
+            if (oldProduct) {
+
+                oldProduct.stock =
+                    Number(
+                        oldProduct.stock || 0
+                    ) -
+                    Number(
+                        sale.quantity || 0
+                    );
+            }
+
+
+            showToast(
+                "Insufficient Stock",
+                `Only ${formatNumber(
+                    product.stock
+                )} unit(s) are available.`,
+                "error"
+            );
+
+            return;
+        }
+
+
+        product.stock =
+            Number(product.stock || 0) -
+            quantity;
+
+
+        const profit =
+            (
+                price -
+                Number(
+                    product.costPrice || 0
+                )
+            ) *
+            quantity;
+
+
+        sale.date =
+            date;
+
+        sale.productId =
+            productId;
+
+        sale.customerId =
+            customerId;
+
+        sale.quantity =
+            quantity;
+
+        sale.price =
+            price;
+
+        sale.total =
+            total;
+
+        sale.profit =
+            profit;
+
+        sale.notes =
+            notes;
+
+
+        saveData();
+
+        refreshApplication();
+
+        closeModal("saleModal");
+
+
+        showToast(
+            "Sale Updated",
+            "The sale was updated successfully.",
+            "success"
+        );
+
+        return;
+    }
+
+
+    /*
+       NEW SALE
+    */
+
+    if (
+        Number(product.stock || 0) <
+        quantity
+    ) {
+
+        showToast(
+            "Insufficient Stock",
+            `Only ${formatNumber(
+                product.stock
+            )} unit(s) are available.`,
+            "error"
+        );
+
+        return;
+    }
+
+
+    const profit =
+        (
+            price -
+            Number(
+                product.costPrice || 0
+            )
+        ) *
+        quantity;
+
+
+    product.stock =
+        Number(product.stock || 0) -
+        quantity;
+
+
+    appData.sales.push({
+
+        id: generateId("sale"),
+
+        date,
+
+        productId,
+
+        customerId,
+
+        quantity,
+
+        price,
+
+        total,
+
+        profit,
+
+        notes,
+
+        createdAt:
+            new Date().toISOString()
+    });
+
+
+    saveData();
+
+    refreshApplication();
+
+    closeModal("saleModal");
+
+
+    showToast(
+        "Sale Recorded",
+        `Sale of ${formatNumber(
+            quantity
+        )} unit(s) recorded successfully.`,
+        "success"
+    );
+}
+
+
+/* =========================================================
+   SAVE EXPENSE
+========================================================= */
+
+function saveExpense() {
+
+    const id =
+        getElement("expenseId").value.trim();
+
+    const date =
+        getElement("expenseDate").value;
+
+    const name =
+        getElement("expenseName").value.trim();
+
+    const category =
+        getElement("expenseCategory").value;
+
+    const amount =
+        Number(
+            getElement("expenseAmount").value
+        );
+
+    const notes =
+        getElement("expenseNotes").value.trim();
+
+
+    if (!date || !name) {
+
+        showToast(
+            "Missing Information",
+            "Enter the expense date and name.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    if (
+        !Number.isFinite(amount) ||
+        amount < 0
+    ) {
+
+        showToast(
+            "Invalid Amount",
+            "Enter a valid expense amount.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    if (id) {
+
+        const expense =
+            appData.expenses.find(
+                item => item.id === id
+            );
+
+        if (!expense) {
+            return;
+        }
+
+
+        expense.date =
+            date;
+
+        expense.name =
+            name;
+
+        expense.category =
+            category;
+
+        expense.amount =
+            amount;
+
+        expense.notes =
+            notes;
+
+
+        saveData();
+
+        refreshApplication();
+
+        closeModal("expenseModal");
+
+
+        showToast(
+            "Expense Updated",
+            "The expense was updated successfully.",
+            "success"
+        );
+
+        return;
+    }
+
+
+    appData.expenses.push({
+
+        id: generateId("expense"),
+
+        date,
+
+        name,
+
+        category,
+
+        amount,
+
+        notes,
+
+        createdAt:
+            new Date().toISOString()
+    });
+
+
+    saveData();
+
+    refreshApplication();
+
+    closeModal("expenseModal");
+
+
+    showToast(
+        "Expense Added",
+        `${name} was added successfully.`,
+        "success"
+    );
+}
+
+
+/* =========================================================
+   SAVE CUSTOMER
+========================================================= */
+
+function saveCustomer() {
+
+    const id =
+        getElement("customerId").value.trim();
+
+    const name =
+        getElement("customerName").value.trim();
+
+    const phone =
+        getElement("customerPhone").value.trim();
+
+    const email =
+        getElement("customerEmail").value.trim();
+
+    const address =
+        getElement("customerAddress").value.trim();
+
+
+    if (!name) {
+
+        showToast(
+            "Missing Name",
+            "Enter the customer's name.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    if (id) {
+
+        const customer =
+            getCustomerById(id);
+
+        if (!customer) {
+            return;
+        }
+
+
+        customer.name =
+            name;
+
+        customer.phone =
+            phone;
+
+        customer.email =
+            email;
+
+        customer.address =
+            address;
+
+
+        saveData();
+
+        refreshApplication();
+
+        closeModal("customerModal");
+
+
+        showToast(
+            "Customer Updated",
+            `${name} was updated successfully.`,
+            "success"
+        );
+
+        return;
+    }
+
+
+    appData.customers.push({
+
+        id: generateId("customer"),
+
+        name,
+
+        phone,
+
+        email,
+
+        address,
+
+        createdAt:
+            new Date().toISOString()
+    });
+
+
+    saveData();
+
+    refreshApplication();
+
+    closeModal("customerModal");
+
+
+    showToast(
+        "Customer Added",
+        `${name} was added successfully.`,
+        "success"
+    );
+}
+
+
+/* =========================================================
+   SEARCH
+========================================================= */
+
+function initializeSearch() {
+
+    const productSearch =
+        getElement("productSearch");
+
+    const salesSearch =
+        getElement("salesSearch");
+
+    const expenseSearch =
+        getElement("expenseSearch");
+
+    const customerSearch =
+        getElement("customerSearch");
+
+
+    if (productSearch) {
+
+        productSearch.addEventListener(
+            "input",
+            () =>
+                renderProducts(
+                    productSearch.value
+                )
+        );
+    }
+
+
+    if (salesSearch) {
+
+        salesSearch.addEventListener(
+            "input",
+            () =>
+                renderSales(
+                    salesSearch.value
+                )
+        );
+    }
+
+
+    if (expenseSearch) {
+
+        expenseSearch.addEventListener(
+            "input",
+            () =>
+                renderExpenses(
+                    expenseSearch.value
+                )
+        );
+    }
+
+
+    if (customerSearch) {
+
+        customerSearch.addEventListener(
+            "input",
+            () =>
+                renderCustomers(
+                    customerSearch.value
+                )
+        );
+    }
+}
+
+
+/* =========================================================
+   MODALS
+========================================================= */
+
+function initializeModals() {
 
     document.querySelectorAll(
         "[data-close-modal]"
     ).forEach(button => {
+
         button.addEventListener(
             "click",
             () => {
+
                 closeModal(
                     button.dataset.closeModal
                 );
@@ -2533,41 +3327,1391 @@ function initializeEventListeners() {
     });
 
 
-    /* ---------- Click outside modal ---------- */
+    document.querySelectorAll(
+        ".modal"
+    ).forEach(modal => {
 
-    document.querySelectorAll(".modal")
-        .forEach(modal => {
-            modal.addEventListener(
-                "click",
-                event => {
-                    if (
-                        event.target === modal
-                    ) {
-                        modal.classList.remove(
-                            "active"
-                        );
-                    }
+        modal.addEventListener(
+            "click",
+            event => {
+
+                if (
+                    event.target === modal
+                ) {
+
+                    closeModal(
+                        modal.id
+                    );
                 }
-            );
-        });
+            }
+        );
+    });
 
-
-    /* ---------- Action buttons ---------- */
-
-    document.addEventListener(
-        "click",
-        handleActionClick
-    );
-
-
-    /* ---------- Escape key ---------- */
 
     document.addEventListener(
         "keydown",
         event => {
-            if (event.key === "Escape") {
-                closeAllModals();
-                closeMobileMenu();
+
+            if (
+                event.key === "Escape"
+            ) {
+
+                document
+                    .querySelectorAll(
+                        ".modal.show"
+                    )
+                    .forEach(modal => {
+
+                        closeModal(
+                            modal.id
+                        );
+                    });
+            }
+        }
+    );
+}
+
+
+function openModal(id) {
+
+    const modal =
+        getElement(id);
+
+    if (!modal) {
+        return;
+    }
+
+
+    modal.classList.add("show");
+
+    modal.setAttribute(
+        "aria-hidden",
+        "false"
+    );
+
+
+    document.body.style.overflow =
+        "hidden";
+}
+
+
+function closeModal(id) {
+
+    const modal =
+        getElement(id);
+
+    if (!modal) {
+        return;
+    }
+
+
+    modal.classList.remove("show");
+
+    modal.setAttribute(
+        "aria-hidden",
+        "true"
+    );
+
+
+    if (
+        document.querySelectorAll(
+            ".modal.show"
+        ).length === 0
+    ) {
+
+        document.body.style.overflow =
+            "";
+    }
+}
+
+
+/* =========================================================
+   RECEIPT
+========================================================= */
+
+function viewReceipt(id) {
+
+    const sale =
+        appData.sales.find(
+            item => item.id === id
+        );
+
+    if (!sale) {
+        return;
+    }
+
+
+    const product =
+        getProductById(
+            sale.productId
+        );
+
+
+    const customer =
+        getCustomerById(
+            sale.customerId
+        );
+
+
+    getElement("receiptNumber").textContent =
+        sale.id.substring(0, 12).toUpperCase();
+
+
+    getElement("receiptDate").textContent =
+        formatDate(sale.date);
+
+
+    getElement("receiptCustomer").textContent =
+        customer
+            ? customer.name
+            : "Walk-in Customer";
+
+
+    getElement("receiptProduct").textContent =
+        product
+            ? product.name
+            : "Deleted Product";
+
+
+    getElement("receiptQuantity").textContent =
+        formatNumber(
+            sale.quantity
+        );
+
+
+    getElement("receiptAmount").textContent =
+        formatCurrency(
+            sale.price
+        );
+
+
+    getElement("receiptTotal").textContent =
+        formatCurrency(
+            sale.total
+        );
+
+
+    updateBusinessInformation();
+
+
+    openModal("receiptModal");
+}
+
+
+function printReceipt() {
+
+    const receipt =
+        getElement("receiptContent");
+
+    if (!receipt) {
+        return;
+    }
+
+
+    const printWindow =
+        window.open(
+            "",
+            "_blank",
+            "width=500,height=700"
+        );
+
+
+    if (!printWindow) {
+
+        showToast(
+            "Print Blocked",
+            "Allow pop-ups in your browser to print the receipt.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    printWindow.document.write(`
+        <!DOCTYPE html>
+
+        <html>
+
+        <head>
+
+            <title>
+                Sales Receipt
+            </title>
+
+            <style>
+
+                * {
+                    box-sizing:border-box;
+                }
+
+                body {
+                    font-family:
+                        Arial,
+                        sans-serif;
+
+                    padding:25px;
+
+                    color:#172033;
+                }
+
+                .receipt {
+                    max-width:450px;
+                    margin:auto;
+                }
+
+                .receipt-business {
+                    text-align:center;
+                }
+
+                .receipt-logo {
+                    width:45px;
+                    height:45px;
+                    margin:0 auto 8px;
+
+                    border-radius:12px;
+
+                    background:#f4d35e;
+
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+
+                    font-size:20px;
+                    font-weight:bold;
+                }
+
+                .receipt-business h2 {
+                    margin:0 0 5px;
+                }
+
+                .receipt-business p {
+                    margin:2px 0;
+
+                    font-size:12px;
+
+                    color:#697386;
+                }
+
+                .receipt-divider {
+                    border-top:1px dashed #aaa;
+
+                    margin:18px 0;
+                }
+
+                .receipt-details {
+                    display:grid;
+
+                    grid-template-columns:
+                        repeat(3,1fr);
+
+                    gap:10px;
+                }
+
+                .receipt-details span {
+                    display:block;
+
+                    font-size:9px;
+
+                    color:#888;
+
+                    margin-bottom:3px;
+                }
+
+                .receipt-details strong {
+                    font-size:10px;
+                }
+
+                .receipt-item {
+                    display:grid;
+
+                    grid-template-columns:
+                        1fr 50px 90px;
+
+                    gap:10px;
+
+                    font-size:11px;
+
+                    padding:6px 0;
+                }
+
+                .receipt-item span:last-child {
+                    text-align:right;
+                }
+
+                .receipt-item span:nth-child(2) {
+                    text-align:center;
+                }
+
+                .receipt-total {
+                    display:flex;
+
+                    justify-content:space-between;
+
+                    font-weight:bold;
+
+                    font-size:15px;
+                }
+
+                .receipt-footer {
+                    text-align:center;
+
+                    margin-top:25px;
+
+                    color:#888;
+
+                    font-size:11px;
+                }
+
+            </style>
+
+        </head>
+
+        <body>
+
+            ${receipt.outerHTML}
+
+            <script>
+
+                window.onload = function() {
+                    window.print();
+                    window.onafterprint = function() {
+                        window.close();
+                    };
+                };
+
+            <\/script>
+
+        </body>
+
+        </html>
+    `);
+
+
+    printWindow.document.close();
+}
+
+
+/* =========================================================
+   REPORTS
+========================================================= */
+
+function initializeReports() {
+
+    const range =
+        getElement("reportRange");
+
+    const chartRange =
+        getElement("salesChartRange");
+
+    const printBtn =
+        getElement("printReportBtn");
+
+
+    if (range) {
+
+        range.addEventListener(
+            "change",
+            () => {
+
+                currentReportRange =
+                    range.value;
+
+                updateReports();
+            }
+        );
+    }
+
+
+    if (chartRange) {
+
+        chartRange.addEventListener(
+            "change",
+            renderSalesChart
+        );
+    }
+
+
+    if (printBtn) {
+
+        printBtn.addEventListener(
+            "click",
+            () => {
+
+                openPage("reports");
+
+                setTimeout(
+                    () => window.print(),
+                    200
+                );
+            }
+        );
+    }
+}
+
+
+function getDateRangeStart(range) {
+
+    if (range === "all") {
+        return null;
+    }
+
+
+    const days =
+        Number(range);
+
+
+    if (!Number.isFinite(days)) {
+        return null;
+    }
+
+
+    const date =
+        new Date();
+
+
+    date.setHours(
+        0,
+        0,
+        0,
+        0
+    );
+
+
+    date.setDate(
+        date.getDate() -
+        (days - 1)
+    );
+
+
+    return date;
+}
+
+
+function isWithinRange(
+    dateString,
+    range
+) {
+
+    if (range === "all") {
+        return true;
+    }
+
+
+    const start =
+        getDateRangeStart(range);
+
+
+    if (!start) {
+        return true;
+    }
+
+
+    const date =
+        new Date(
+            dateString +
+            "T00:00:00"
+        );
+
+
+    return date >= start;
+}
+
+
+function updateReports() {
+
+    const range =
+        currentReportRange;
+
+
+    const filteredSales =
+        appData.sales.filter(
+            sale =>
+                isWithinRange(
+                    sale.date,
+                    range
+                )
+        );
+
+
+    const filteredExpenses =
+        appData.expenses.filter(
+            expense =>
+                isWithinRange(
+                    expense.date,
+                    range
+                )
+        );
+
+
+    const revenue =
+        filteredSales.reduce(
+            (sum, sale) =>
+                sum +
+                Number(
+                    sale.total || 0
+                ),
+            0
+        );
+
+
+    const expenses =
+        filteredExpenses.reduce(
+            (sum, expense) =>
+                sum +
+                Number(
+                    expense.amount || 0
+                ),
+            0
+        );
+
+
+    const profit =
+        revenue -
+        expenses;
+
+
+    const reportRevenue =
+        getElement("reportRevenue");
+
+    const reportExpenses =
+        getElement("reportExpenses");
+
+    const reportProfit =
+        getElement("reportProfit");
+
+    const reportTransactions =
+        getElement("reportTransactions");
+
+
+    if (reportRevenue) {
+        reportRevenue.textContent =
+            formatCurrency(revenue);
+    }
+
+
+    if (reportExpenses) {
+        reportExpenses.textContent =
+            formatCurrency(expenses);
+    }
+
+
+    if (reportProfit) {
+
+        reportProfit.textContent =
+            formatCurrency(profit);
+
+        reportProfit.style.color =
+            profit < 0
+                ? "#d93025"
+                : "";
+    }
+
+
+    if (reportTransactions) {
+        reportTransactions.textContent =
+            formatNumber(
+                filteredSales.length
+            );
+    }
+
+
+    renderReportSummary(
+        revenue,
+        expenses,
+        profit
+    );
+
+
+    renderTopProducts(
+        filteredSales
+    );
+}
+
+
+function renderReportSummary(
+    revenue,
+    expenses,
+    profit
+) {
+
+    const container =
+        getElement("reportSummary");
+
+    if (!container) {
+        return;
+    }
+
+
+    if (
+        revenue === 0 &&
+        expenses === 0
+    ) {
+
+        container.innerHTML = `
+            <div class="empty-state">
+
+                <div class="empty-icon">
+                    📊
+                </div>
+
+                <h4>
+                    No report data
+                </h4>
+
+                <p>
+                    Record sales and expenses to
+                    generate your report.
+                </p>
+
+            </div>
+        `;
+
+        return;
+    }
+
+
+    container.innerHTML = `
+        <div class="summary-list">
+
+            <div class="summary-row">
+
+                <span>
+                    Total Revenue
+                </span>
+
+                <strong>
+                    ${formatCurrency(revenue)}
+                </strong>
+
+            </div>
+
+
+            <div class="summary-row">
+
+                <span>
+                    Total Expenses
+                </span>
+
+                <strong>
+                    ${formatCurrency(expenses)}
+                </strong>
+
+            </div>
+
+
+            <div class="summary-row profit-row">
+
+                <span>
+                    Net Profit
+                </span>
+
+                <strong>
+                    ${formatCurrency(profit)}
+                </strong>
+
+            </div>
+
+
+            <div class="summary-row">
+
+                <span>
+                    Profit Margin
+                </span>
+
+                <strong>
+                    ${
+                        revenue > 0
+                            ? (
+                                (
+                                    profit /
+                                    revenue
+                                ) *
+                                100
+                            ).toFixed(1)
+                            : "0.0"
+                    }%
+                </strong>
+
+            </div>
+
+        </div>
+    `;
+}
+
+
+function renderTopProducts(
+    sales
+) {
+
+    const container =
+        getElement("topProducts");
+
+    if (!container) {
+        return;
+    }
+
+
+    const productMap = {};
+
+
+    sales.forEach(sale => {
+
+        if (!productMap[sale.productId]) {
+
+            productMap[sale.productId] = {
+                quantity: 0,
+                revenue: 0
+            };
+        }
+
+
+        productMap[sale.productId].quantity +=
+            Number(
+                sale.quantity || 0
+            );
+
+
+        productMap[sale.productId].revenue +=
+            Number(
+                sale.total || 0
+            );
+    });
+
+
+    const products =
+        Object.entries(productMap)
+            .map(
+                ([productId, values]) => {
+
+                    const product =
+                        getProductById(
+                            productId
+                        );
+
+
+                    return {
+                        name:
+                            product
+                                ? product.name
+                                : "Deleted Product",
+
+                        quantity:
+                            values.quantity,
+
+                        revenue:
+                            values.revenue
+                    };
+                }
+            )
+            .sort(
+                (a, b) =>
+                    b.revenue -
+                    a.revenue
+            )
+            .slice(0, 5);
+
+
+    if (products.length === 0) {
+
+        container.innerHTML = `
+            <div class="empty-state">
+
+                <div class="empty-icon">
+                    📦
+                </div>
+
+                <h4>
+                    No product data
+                </h4>
+
+                <p>
+                    Sales information will appear here.
+                </p>
+
+            </div>
+        `;
+
+        return;
+    }
+
+
+    container.innerHTML =
+        products.map(
+            (product, index) => {
+
+                return `
+                    <div class="top-product-item">
+
+                        <div class="top-product-rank">
+                            ${index + 1}
+                        </div>
+
+                        <div class="top-product-info">
+
+                            <strong>
+                                ${escapeHTML(
+                                    product.name
+                                )}
+                            </strong>
+
+                            <small>
+                                ${formatNumber(
+                                    product.quantity
+                                )}
+                                unit(s) sold
+                            </small>
+
+                        </div>
+
+                        <div class="top-product-value">
+                            ${formatCurrency(
+                                product.revenue
+                            )}
+                        </div>
+
+                    </div>
+                `;
+            }
+        )
+        .join("");
+}
+
+
+/* =========================================================
+   SETTINGS
+========================================================= */
+
+function initializeSettings() {
+
+    const form =
+        getElement(
+            "businessSettingsForm"
+        );
+
+
+    if (form) {
+
+        form.addEventListener(
+            "submit",
+            event => {
+
+                event.preventDefault();
+
+                saveBusinessSettings();
+            }
+        );
+    }
+
+
+    const exportBtn =
+        getElement("exportDataBtn");
+
+    const importBtn =
+        getElement("importDataBtn");
+
+    const importFile =
+        getElement("importFile");
+
+    const clearBtn =
+        getElement("clearDataBtn");
+
+
+    if (exportBtn) {
+
+        exportBtn.addEventListener(
+            "click",
+            exportData
+        );
+    }
+
+
+    if (importBtn) {
+
+        importBtn.addEventListener(
+            "click",
+            () => {
+
+                if (importFile) {
+                    importFile.click();
+                }
+            }
+        );
+    }
+
+
+    if (importFile) {
+
+        importFile.addEventListener(
+            "change",
+            handleImportFile
+        );
+    }
+
+
+    if (clearBtn) {
+
+        clearBtn.addEventListener(
+            "click",
+            clearAllData
+        );
+    }
+}
+
+
+function updateSettingsForm() {
+
+    const name =
+        getElement("businessName");
+
+    const phone =
+        getElement("businessPhone");
+
+    const address =
+        getElement("businessAddress");
+
+
+    if (name) {
+        name.value =
+            appData.business.name || "";
+    }
+
+
+    if (phone) {
+        phone.value =
+            appData.business.phone || "";
+    }
+
+
+    if (address) {
+        address.value =
+            appData.business.address || "";
+    }
+}
+
+
+function saveBusinessSettings() {
+
+    const name =
+        getElement("businessName")
+            .value
+            .trim();
+
+
+    const phone =
+        getElement("businessPhone")
+            .value
+            .trim();
+
+
+    const address =
+        getElement("businessAddress")
+            .value
+            .trim();
+
+
+    if (!name) {
+
+        showToast(
+            "Business Name Required",
+            "Enter your business name.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    appData.business.name =
+        name;
+
+    appData.business.phone =
+        phone;
+
+    appData.business.address =
+        address;
+
+
+    saveData();
+
+    updateBusinessInformation();
+
+
+    showToast(
+        "Settings Saved",
+        "Your business information has been updated.",
+        "success"
+    );
+}
+
+
+/* =========================================================
+   EXPORT DATA
+========================================================= */
+
+function exportData() {
+
+    const data =
+        JSON.stringify(
+            appData,
+            null,
+            2
+        );
+
+
+    const blob =
+        new Blob(
+            [data],
+            {
+                type:
+                    "application/json"
+            }
+        );
+
+
+    const url =
+        URL.createObjectURL(
+            blob
+        );
+
+
+    const link =
+        document.createElement("a");
+
+
+    const businessName =
+        (
+            appData.business.name ||
+            "business"
+        )
+            .replace(
+                /[^a-z0-9]/gi,
+                "_"
+            );
+
+
+    link.href =
+        url;
+
+    link.download =
+        `${businessName}_profit_analyzer_backup.json`;
+
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    link.remove();
+
+
+    URL.revokeObjectURL(url);
+
+
+    showToast(
+        "Data Exported",
+        "Your business data has been downloaded.",
+        "success"
+    );
+}
+
+
+/* =========================================================
+   IMPORT DATA
+========================================================= */
+
+function handleImportFile(event) {
+
+    const file =
+        event.target.files[0];
+
+    if (!file) {
+        return;
+    }
+
+
+    const reader =
+        new FileReader();
+
+
+    reader.onload = function() {
+
+        try {
+
+            const imported =
+                JSON.parse(
+                    reader.result
+                );
+
+
+            if (
+                !imported ||
+                typeof imported !==
+                    "object"
+            ) {
+
+                throw new Error(
+                    "Invalid data"
+                );
+            }
+
+
+            appData = {
+
+                business: {
+                    ...defaultData.business,
+                    ...(imported.business || {})
+                },
+
+                products:
+                    Array.isArray(
+                        imported.products
+                    )
+                        ? imported.products
+                        : [],
+
+                sales:
+                    Array.isArray(
+                        imported.sales
+                    )
+                        ? imported.sales
+                        : [],
+
+                expenses:
+                    Array.isArray(
+                        imported.expenses
+                    )
+                        ? imported.expenses
+                        : [],
+
+                customers:
+                    Array.isArray(
+                        imported.customers
+                    )
+                        ? imported.customers
+                        : []
+            };
+
+
+            saveData();
+
+            refreshApplication();
+
+
+            showToast(
+                "Data Imported",
+                "Your business data was restored successfully.",
+                "success"
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                "Import error:",
+                error
+            );
+
+
+            showToast(
+                "Import Failed",
+                "The selected file is not a valid Profit Analyzer backup.",
+                "error"
+            );
+        }
+
+
+        event.target.value = "";
+    };
+
+
+    reader.onerror = function() {
+
+        showToast(
+            "Import Failed",
+            "Unable to read the selected file.",
+            "error"
+        );
+
+        event.target.value = "";
+    };
+
+
+    reader.readAsText(file);
+}
+
+
+/* =========================================================
+   CLEAR ALL DATA
+========================================================= */
+
+function clearAllData() {
+
+    const confirmed =
+        window.confirm(
+            "This will permanently remove all products, sales, expenses, customers and business information from this device. Continue?"
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    const secondConfirmation =
+        window.confirm(
+            "Are you absolutely sure? Make sure you have exported a backup if you need your data later."
+        );
+
+
+    if (!secondConfirmation) {
+        return;
+    }
+
+
+    appData =
+        JSON.parse(
+            JSON.stringify(
+                defaultData
+            )
+        );
+
+
+    saveData();
+
+    refreshApplication();
+
+
+    showToast(
+        "Data Cleared",
+        "All business data has been removed from this device.",
+        "success"
+    );
+}
+
+
+/* =========================================================
+   DATES
+========================================================= */
+
+function setDefaultDates() {
+
+    const saleDate =
+        getElement("saleDate");
+
+    const expenseDate =
+        getElement("expenseDate");
+
+
+    if (saleDate) {
+        saleDate.value =
+            getToday();
+    }
+
+
+    if (expenseDate) {
+        expenseDate.value =
+            getToday();
+    }
+}
+
+
+/* =========================================================
+   TOAST NOTIFICATIONS
+========================================================= */
+
+function showToast(
+    title,
+    message,
+    type = "success"
+) {
+
+    const toast =
+        getElement("toast");
+
+    const toastTitle =
+        getElement("toastTitle");
+
+    const toastMessage =
+        getElement("toastMessage");
+
+    const toastIcon =
+        getElement("toastIcon");
+
+
+    if (
+        !toast ||
+        !toastTitle ||
+        !toastMessage ||
+        !toastIcon
+    ) {
+        return;
+    }
+
+
+    toastTitle.textContent =
+        title;
+
+    toastMessage.textContent =
+        message;
+
+
+    if (type === "error") {
+
+        toastIcon.textContent =
+            "×";
+
+        toastIcon.style.color =
+            "#ff8f86";
+
+    } else {
+
+        toastIcon.textContent =
+            "✓";
+
+        toastIcon.style.color =
+            "#f4d35e";
+    }
+
+
+    toast.classList.add("show");
+
+
+    clearTimeout(
+        toastTimer
+    );
+
+
+    toastTimer =
+        setTimeout(
+            () => {
+
+                toast.classList.remove(
+                    "show"
+                );
+
+            },
+            4000
+        );
+}
+
+
+const toastClose =
+    getElement("toastClose");
+
+
+if (toastClose) {
+
+    toastClose.addEventListener(
+        "click",
+        () => {
+
+            const toast =
+                getElement("toast");
+
+            if (toast) {
+                toast.classList.remove(
+                    "show"
+                );
             }
         }
     );
@@ -2575,31 +4719,85 @@ function initializeEventListeners() {
 
 
 /* =========================================================
-   INITIALIZE APP
-   ========================================================= */
+   PRINT RECEIPT BUTTON
+========================================================= */
 
-function initializeApp() {
-    initializeEventListeners();
+document.addEventListener(
+    "DOMContentLoaded",
+    () => {
 
-    loadBusinessSettings();
-
-    updateSaleProductSuggestions();
-
-    renderAll();
-
-    showPage("dashboard");
-
-    console.log(
-        "Business Profit Analyzer initialized successfully."
-    );
-}
+        const printReceiptBtn =
+            getElement(
+                "printReceiptBtn"
+            );
 
 
-if (document.readyState === "loading") {
-    document.addEventListener(
-        "DOMContentLoaded",
-        initializeApp
-    );
-} else {
-    initializeApp();
-}
+        if (printReceiptBtn) {
+
+            printReceiptBtn.addEventListener(
+                "click",
+                printReceipt
+            );
+        }
+    }
+);
+
+
+/* =========================================================
+   WINDOW RESIZE
+========================================================= */
+
+window.addEventListener(
+    "resize",
+    () => {
+
+        /*
+           Redraw chart after resizing.
+        */
+
+        const dashboard =
+            getElement(
+                "dashboardPage"
+            );
+
+
+        if (
+            dashboard &&
+            dashboard.classList.contains(
+                "active"
+            )
+        ) {
+            renderSalesChart();
+        }
+    }
+);
+
+
+/* =========================================================
+   GLOBAL FUNCTIONS
+   Required by inline action buttons.
+========================================================= */
+
+window.editProduct =
+    editProduct;
+
+window.deleteProduct =
+    deleteProduct;
+
+window.deleteSale =
+    deleteSale;
+
+window.viewReceipt =
+    viewReceipt;
+
+window.editExpense =
+    editExpense;
+
+window.deleteExpense =
+    deleteExpense;
+
+window.editCustomer =
+    editCustomer;
+
+window.deleteCustomer =
+    deleteCustomer;
