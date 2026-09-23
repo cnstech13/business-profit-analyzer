@@ -3,7 +3,7 @@
    Service Worker
    ========================================================= */
 
-const CACHE_NAME = "business-profit-analyzer-v1";
+const CACHE_NAME = "business-profit-analyzer-v5";
 
 const APP_FILES = [
     "./",
